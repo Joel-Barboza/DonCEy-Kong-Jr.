@@ -1,0 +1,3 @@
+[submodule "Cliente/vendored/SDL"]
+	path = Cliente/vendored/SDL
+	url = https://github.com/libsdl-org/SDL.git
