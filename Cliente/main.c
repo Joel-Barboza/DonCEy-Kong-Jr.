@@ -29,35 +29,297 @@ static int connected = 0;
 // -----------------------------
 // Nivel: plataformas y lianas
 // -----------------------------
-#define NUM_PLATFORMS 9
-#define NUM_VINES 12
+#define NUM_PLATFORMS 10
+#define NUM_VINES 9
 
 SDL_FRect platforms[NUM_PLATFORMS];
 SDL_FRect vines[NUM_VINES];
 
-void initialize_level_elements() {
+// -----------------------------
+// Mono (personaje)
+// -----------------------------
+typedef struct {
+    SDL_FRect rect;
+    float velocityX;
+    float velocityY;
+    int isOnGround;
+    int facingRight;
+    int isOnVine;        // Nuevo: indica si está en una liana
+    int currentVine;     // Nuevo: índice de la liana actual
+    float vineOffsetX;   // Nuevo: offset horizontal en la liana
+} Monkey;
 
+Monkey monkey;
+
+// Constantes de física
+const float GRAVITY = 0.5f;
+const float JUMP_FORCE = -10.0f;
+const float MOVE_SPEED = 3.0f;
+const float CLIMB_SPEED = 2.5f;  // Nuevo: velocidad de escalada
+
+void initialize_level_elements() {
     platforms[0] = (SDL_FRect){ 20.0f,  60.0f, 400.0f, 18.0f };
     platforms[1] = (SDL_FRect){ 400.0f,  80.0f, 250.0f, 18.0f };
     platforms[2] = (SDL_FRect){ 600.0f,  300.0f, 250.0f, 18.0f };
     platforms[3] = (SDL_FRect){ 200.0f,  200.0f, 100.0f, 18.0f };
     platforms[4] = (SDL_FRect){ 200.0f,  310.0f, 200.0f, 18.0f };
-
+    platforms[5] = (SDL_FRect){ 20.0f,  490.0f, 200.0f, 18.0f };
+    platforms[6] = (SDL_FRect){ 380.0f,  430.0f, 100.0f, 18.0f };
+    platforms[7] = (SDL_FRect){ 510.0f,  460.0f, 100.0f, 18.0f };
+    platforms[8] = (SDL_FRect){ 670.0f,  440.0f, 100.0f, 18.0f };
 
     vines[0]  = (SDL_FRect){  680.0f,  30.0f, 6.0f,  380.0f };
     vines[1]  = (SDL_FRect){ 750.0f,  30.0f, 6.0f,  380.0f };
     vines[2]  = (SDL_FRect){ 280.0f,  200.0f, 6.0f,  200.0f };
-
     vines[3]  = (SDL_FRect){  80.0f,  78.0f, 6.0f,  300.0f };
     vines[4]  = (SDL_FRect){ 150.0f,  78.0f, 6.0f,  300.0f };
     vines[5]  = (SDL_FRect){ 430.0f,  98.0f, 6.0f,  300.0f };
     vines[6]  = (SDL_FRect){ 480.0f,  98.0f, 6.0f,  200.0f };
     vines[7]  = (SDL_FRect){ 590.0f,  98.0f, 6.0f,  260.0f };
     vines[8]  = (SDL_FRect){ 530.0f,  98.0f, 6.0f,  300.0f };
+}
 
+void initialize_monkey() {
+    // Posición inicial del mono (sobre la primera plataforma)
+    monkey.rect = (SDL_FRect){ 50.0f, 470.0f, 24.0f, 32.0f };
+    monkey.velocityX = 0.0f;
+    monkey.velocityY = 0.0f;
+    monkey.isOnGround = 0;
+    monkey.facingRight = 1;
+    monkey.isOnVine = 0;      // Inicialmente no está en liana
+    monkey.currentVine = -1;  // Sin liana actual
+    monkey.vineOffsetX = 0.0f;
+}
 
+// Función para verificar si el mono puede agarrarse a una liana
+int check_vine_collision() {
+    for (int i = 0; i < NUM_VINES; i++) {
+        SDL_FRect v = vines[i];
 
+        // Verificar si el mono está tocando la liana
+        if (monkey.rect.x < v.x + v.w &&
+            monkey.rect.x + monkey.rect.w > v.x &&
+            monkey.rect.y < v.y + v.h &&
+            monkey.rect.y + monkey.rect.h > v.y) {
 
+            // El mono está tocando una liana
+            return i;
+        }
+    }
+    return -1; // No está tocando ninguna liana
+}
+
+// Sistema de colisiones mejorado con soporte para lianas
+void update_monkey_physics() {
+    // Si está en una liana, manejar movimiento especial
+    if (monkey.isOnVine) {
+        // Mantener al mono en la posición de la liana
+        SDL_FRect currentVine = vines[monkey.currentVine];
+        monkey.rect.x = currentVine.x + monkey.vineOffsetX;
+
+        // Aplicar movimiento vertical (escalada)
+        monkey.rect.y += monkey.velocityY;
+
+        // Verificar límites de la liana
+        if (monkey.rect.y < currentVine.y) {
+            monkey.rect.y = currentVine.y;
+            monkey.velocityY = 0;
+        }
+        if (monkey.rect.y + monkey.rect.h > currentVine.y + currentVine.h) {
+            monkey.rect.y = currentVine.y + currentVine.h - monkey.rect.h;
+            monkey.velocityY = 0;
+
+            // Si llega al fondo de la liana, verificar si está sobre una plataforma
+            for (int i = 0; i < NUM_PLATFORMS; i++) {
+                if (monkey.rect.x < platforms[i].x + platforms[i].w &&
+                    monkey.rect.x + monkey.rect.w > platforms[i].x &&
+                    monkey.rect.y + monkey.rect.h <= platforms[i].y + 5 &&  // Cerca de la plataforma
+                    monkey.rect.y + monkey.rect.h >= platforms[i].y) {
+
+                    // Salir de la liana y colocarse sobre la plataforma
+                    monkey.isOnVine = 0;
+                    monkey.currentVine = -1;
+                    monkey.rect.y = platforms[i].y - monkey.rect.h;
+                    monkey.velocityY = 0;
+                    monkey.isOnGround = 1;
+                    return;
+                }
+            }
+        }
+
+        return; // Saltar el resto de la física normal cuando está en liana
+    }
+
+    // Física normal (cuando no está en liana)
+
+    // Aplicar gravedad
+    monkey.velocityY += GRAVITY;
+
+    // Mover en X
+    monkey.rect.x += monkey.velocityX;
+
+    // Verificar colisiones horizontales con plataformas
+    for (int i = 0; i < NUM_PLATFORMS; i++) {
+        if (monkey.rect.x < platforms[i].x + platforms[i].w &&
+            monkey.rect.x + monkey.rect.w > platforms[i].x &&
+            monkey.rect.y < platforms[i].y + platforms[i].h &&
+            monkey.rect.y + monkey.rect.h > platforms[i].y) {
+
+            if (monkey.velocityX > 0) {
+                // Colisión por la derecha
+                monkey.rect.x = platforms[i].x - monkey.rect.w;
+            } else if (monkey.velocityX < 0) {
+                // Colisión por la izquierda
+                monkey.rect.x = platforms[i].x + platforms[i].w;
+            }
+            monkey.velocityX = 0;
+        }
+    }
+
+    // Mover en Y
+    monkey.rect.y += monkey.velocityY;
+    monkey.isOnGround = 0;
+
+    // Verificar colisiones verticales con plataformas
+    for (int i = 0; i < NUM_PLATFORMS; i++) {
+        if (monkey.rect.x < platforms[i].x + platforms[i].w &&
+            monkey.rect.x + monkey.rect.w > platforms[i].x &&
+            monkey.rect.y < platforms[i].y + platforms[i].h &&
+            monkey.rect.y + monkey.rect.h > platforms[i].y) {
+
+            if (monkey.velocityY > 0) {
+                // Colisión por abajo (cayendo sobre plataforma)
+                monkey.rect.y = platforms[i].y - monkey.rect.h;
+                monkey.velocityY = 0;
+                monkey.isOnGround = 1;
+            } else if (monkey.velocityY < 0) {
+                // Colisión por arriba (saltando contra plataforma)
+                monkey.rect.y = platforms[i].y + platforms[i].h;
+                monkey.velocityY = 0;
+            }
+        }
+    }
+
+    // Limites de pantalla
+    if (monkey.rect.x < 0) {
+        monkey.rect.x = 0;
+        monkey.velocityX = 0;
+    }
+    if (monkey.rect.x + monkey.rect.w > 800) {
+        monkey.rect.x = 800 - monkey.rect.w;
+        monkey.velocityX = 0;
+    }
+    if (monkey.rect.y + monkey.rect.h > 600) {
+        monkey.rect.y = 600 - monkey.rect.h;
+        monkey.velocityY = 0;
+        monkey.isOnGround = 1;
+    }
+
+    // Fricción simple
+    if (monkey.isOnGround) {
+        monkey.velocityX *= 0.8f;
+        if (SDL_fabsf(monkey.velocityX) < 0.5f) monkey.velocityX = 0;
+    }
+}
+
+void handle_input(const Uint8* keyboard_state) {
+    // Si está en una liana, manejar controles de escalada
+    if (monkey.isOnVine) {
+        monkey.velocityX = 0; // No movimiento horizontal en lianas
+
+        // Escalada hacia arriba y abajo
+        if (keyboard_state[SDL_SCANCODE_UP]) {
+            monkey.velocityY = -CLIMB_SPEED;
+        }
+        else if (keyboard_state[SDL_SCANCODE_DOWN]) {
+            monkey.velocityY = CLIMB_SPEED;
+        }
+        else {
+            monkey.velocityY = 0; // No moverse si no se presiona nada
+        }
+
+        // Salto para soltarse de la liana
+        if (keyboard_state[SDL_SCANCODE_LEFT] || keyboard_state[SDL_SCANCODE_RIGHT]) {
+            monkey.isOnVine = 0;
+            monkey.currentVine = -1;
+            monkey.velocityY = 0;
+            // Dar un pequeño impulso en la dirección presionada
+            if (keyboard_state[SDL_SCANCODE_LEFT]) {
+                monkey.velocityX = -MOVE_SPEED * 0.5f;
+                monkey.facingRight = 0;
+            } else {
+                monkey.velocityX = MOVE_SPEED * 0.5f;
+                monkey.facingRight = 1;
+            }
+        }
+
+        return;
+    }
+
+    // Movimiento normal (cuando no está en liana)
+
+    // Movimiento horizontal
+    if (keyboard_state[SDL_SCANCODE_LEFT]) {
+        monkey.velocityX = -MOVE_SPEED;
+        monkey.facingRight = 0;
+    }
+    else if (keyboard_state[SDL_SCANCODE_RIGHT]) {
+        monkey.velocityX = MOVE_SPEED;
+        monkey.facingRight = 1;
+    }
+
+    // Salto
+    if (keyboard_state[SDL_SCANCODE_UP] && monkey.isOnGround) {
+        monkey.velocityY = JUMP_FORCE;
+        monkey.isOnGround = 0;
+    }
+
+    // Verificar si puede agarrarse a una liana (cuando salta cerca de una)
+    if (!monkey.isOnGround && keyboard_state[SDL_SCANCODE_UP]) {
+        int vineIndex = check_vine_collision();
+        if (vineIndex != -1) {
+            monkey.isOnVine = 1;
+            monkey.currentVine = vineIndex;
+            monkey.velocityY = 0;
+            monkey.velocityX = 0;
+            // Calcular offset para centrarse en la liana
+            monkey.vineOffsetX = (vines[vineIndex].w - monkey.rect.w) / 2.0f;
+        }
+    }
+}
+
+void draw_monkey(SDL_Renderer* renderer) {
+    // Si está en liana, cambiar color para indicarlo
+    if (monkey.isOnVine) {
+        SDL_SetRenderDrawColor(renderer, 100, 50, 10, 255); // Marrón más oscuro
+    } else {
+        SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Marrón normal
+    }
+    SDL_RenderFillRect(renderer, &monkey.rect);
+
+    // Cara
+    SDL_SetRenderDrawColor(renderer, 255, 220, 170, 255);
+    SDL_FRect face = {
+        monkey.rect.x + (monkey.facingRight ? 6 : 2),
+        monkey.rect.y + 4,
+        monkey.rect.w - 8,
+        monkey.rect.h - 12
+    };
+    SDL_RenderFillRect(renderer, &face);
+
+    // Ojos
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    if (monkey.facingRight) {
+        SDL_FRect eye1 = { monkey.rect.x + 14, monkey.rect.y + 10, 3, 3 };
+        SDL_FRect eye2 = { monkey.rect.x + 18, monkey.rect.y + 10, 3, 3 };
+        SDL_RenderFillRect(renderer, &eye1);
+        SDL_RenderFillRect(renderer, &eye2);
+    } else {
+        SDL_FRect eye1 = { monkey.rect.x + 7, monkey.rect.y + 10, 3, 3 };
+        SDL_FRect eye2 = { monkey.rect.x + 11, monkey.rect.y + 10, 3, 3 };
+        SDL_RenderFillRect(renderer, &eye1);
+        SDL_RenderFillRect(renderer, &eye2);
+    }
 }
 
 // Dibuja una "textura" simple de plataforma estilo arcade (base + borde)
@@ -90,8 +352,12 @@ void draw_vines(SDL_Renderer* renderer) {
     for (int i = 0; i < NUM_VINES; ++i) {
         SDL_FRect v = vines[i];
 
-        // tronco principal (verde claro)
-        SDL_SetRenderDrawColor(renderer, 90, 200, 80, 255);
+        // Si el mono está en esta liana, resaltarla
+        if (monkey.isOnVine && monkey.currentVine == i) {
+            SDL_SetRenderDrawColor(renderer, 120, 230, 100, 255); // Verde brillante
+        } else {
+            SDL_SetRenderDrawColor(renderer, 90, 200, 80, 255); // Verde normal
+        }
         SDL_RenderFillRect(renderer, &v);
 
         // nudos / hojas cada 28 px a partir del inicio
@@ -102,38 +368,11 @@ void draw_vines(SDL_Renderer* renderer) {
             SDL_RenderFillRect(renderer, &knot);
         }
 
-
         if (v.h > 200.0f) {
             SDL_SetRenderDrawColor(renderer, 30, 160, 40, 255);
             SDL_FRect leaf = { v.x - 8.0f, v.y + v.h - 8.0f, v.w + 16.0f, 6.0f };
             SDL_RenderFillRect(renderer, &leaf);
         }
-    }
-}
-
-// Dibuja "árboles" verdes en la base (opcional para aproximar la imagen)
-void draw_ground_trees(SDL_Renderer* renderer) {
-    // raíces/madera
-    SDL_SetRenderDrawColor(renderer, 120, 60, 20, 255);
-    SDL_FRect trunks[] = {
-        {70, 480, 60, 40}, {200, 495, 60, 25}, {340, 480, 60, 40}, {480, 495, 60, 25}, {620, 480, 60, 40}
-    };
-    for (int i = 0; i < sizeof(trunks)/sizeof(trunks[0]); ++i) {
-        SDL_RenderFillRect(renderer, &trunks[i]);
-    }
-
-    // copas verdes (superposición para darle estilo pixelado)
-    SDL_SetRenderDrawColor(renderer, 20, 180, 40, 255);
-    SDL_FRect crowns[] = {
-        {50, 450, 100, 36}, {180, 470, 100, 30}, {320, 450, 100, 36}, {460, 470, 100, 30}, {600, 450, 100, 36}
-    };
-    for (int i = 0; i < sizeof(crowns)/sizeof(crowns[0]); ++i) {
-        SDL_RenderFillRect(renderer, &crowns[i]);
-        // borde de la copa
-        SDL_SetRenderDrawColor(renderer, 80, 220, 70, 255);
-        SDL_FRect top = { crowns[i].x, crowns[i].y, crowns[i].w, 6 };
-        SDL_RenderFillRect(renderer, &top);
-        SDL_SetRenderDrawColor(renderer, 20, 180, 40, 255);
     }
 }
 
@@ -152,7 +391,7 @@ int window() {
         return -1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("Donkey Kong Jr - Nivel (sin monos)", 800, 600, 0);
+    SDL_Window *window = SDL_CreateWindow("Donkey Kong Jr - Mono Movible", 800, 600, 0);
     if (!window) {
         SDL_Log("Window create failed: %s", SDL_GetError());
         TTF_Quit();
@@ -177,10 +416,14 @@ int window() {
     Button btn = create_button(renderer, 300, 550, 200, 36, "Conectar", font ? font : NULL);
 
     initialize_level_elements();
+    initialize_monkey();
 
     SDL_Event e;
     int running = 1;
     while (running) {
+        // Obtener estado del teclado
+        const Uint8* keyboard_state = SDL_GetKeyboardState(NULL);
+
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = 0;
 
@@ -195,16 +438,24 @@ int window() {
             }
         }
 
-        // Fondo negro (como en la captura)
+        // Manejar entrada del teclado
+        handle_input(keyboard_state);
+
+        // Actualizar física del mono
+        update_monkey_physics();
+
+        // Fondo negro
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        // Dibujar elementos: plataformas, lianas y árboles de la base
+        // Dibujar elementos del nivel
         draw_platforms(renderer);
         draw_vines(renderer);
-        draw_ground_trees(renderer);
 
-        // botón (mantiene la interfaz de tu proyecto)
+        // Dibujar el mono
+        draw_monkey(renderer);
+
+        // Dibujar botón
         draw_button(renderer, &btn);
 
         SDL_RenderPresent(renderer);
