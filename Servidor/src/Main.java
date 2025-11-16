@@ -7,9 +7,9 @@ public class Main {
 //        AdminPanel panel = new AdminPanel();
 //        panel.createAndShowGUI();
         MainScreen mainScreen = new MainScreen();
-        mainScreen.createGUI();
-        Server server = Server.getInstance();
-        server.startServer();
+
+//        Server server = Server.getInstance();
+//        server.startServer();
 
 //        server.addSubscriber();
 //        server.addSubscriber();

@@ -1,16 +1,17 @@
+
 package GUI;
 
 import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
+        import java.awt.*;
+        import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-public class AdminPanel extends TemplateScreen {
+public class SpectatorScreen extends TemplateScreen {
 
     private final JPanel previousLeftPanel;
     private final JPanel previousRightPanel;
 
-    public AdminPanel (JPanel leftPanel, JPanel rightPanel) {
+    public SpectatorScreen(JPanel leftPanel, JPanel rightPanel) {
         previousLeftPanel = leftPanel;
         previousRightPanel = rightPanel;
     }
@@ -26,7 +27,7 @@ public class AdminPanel extends TemplateScreen {
         Dimension buttonSize = new Dimension(220, 50);         // fixed button size
 
         // Create buttons
-        JButton btnStart = new JButton("Enviar");
+        JButton btnStart = new JButton("Ver");
         JButton btnBack = new JButton("Volver");
 
         JButton[] buttons = {btnStart, btnBack};
@@ -60,7 +61,7 @@ public class AdminPanel extends TemplateScreen {
         btnBack.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                System.out.println("Volviendo a Inicio");
+                System.out.println("Por ahora no hace nada el botón");
                 if (mainFrame != null) {
                     mainFrame.remove(leftPanel);
                     mainFrame.remove(rightPanel);

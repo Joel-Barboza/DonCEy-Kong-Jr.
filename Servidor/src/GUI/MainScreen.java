@@ -1,46 +1,15 @@
 package GUI;
 
+import javax.print.attribute.standard.JobHoldUntil;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
-public class MainScreen {
-
-    private static final Color YELLOW = new Color(255, 163, 0);
-    private static final Color BLUE = new Color(0, 104, 163);
-    private static final Color RED = new Color(251, 0, 0);
-
-    public MainScreen() {
-        JFrame mainFrame = new JFrame();
-        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        mainFrame.setSize(1000, 600);
-        mainFrame.setLocationRelativeTo(null);
-
-        JPanel leftPanel = createLeftPanel();
-        JPanel rightPanel = createRightPanel();
-
-        leftPanel.setPreferredSize(new Dimension(300, 0)); // 1/3 de una ventana de 900px
-
-        mainFrame.setLayout(new BorderLayout());
-        mainFrame.add(leftPanel, BorderLayout.WEST);
-        mainFrame.add(rightPanel, BorderLayout.CENTER);
-
-        mainFrame.setVisible(true);
-    }
+public class MainScreen extends TemplateScreen {
 
 
-    private JPanel createLeftPanel() {
-        JPanel leftPanel = new JPanel();
-        leftPanel.setBackground(RED);
-
-        // Center content vertically and horizontally
-        leftPanel.setLayout(new GridBagLayout());
-
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0;
-        gbc.gridy = GridBagConstraints.RELATIVE;   // automatic vertical stacking
-        gbc.insets = new Insets(10, 0, 10, 0);     // spacing between rows
-        gbc.anchor = GridBagConstraints.CENTER;
-
+    protected JPanel createLeftPanelButtons() {
         // Container to stack buttons vertically
         JPanel buttonContainer = new JPanel();
         buttonContainer.setOpaque(false);          // keep background color from parent
@@ -74,19 +43,39 @@ public class MainScreen {
         buttonContainer.add(Box.createVerticalStrut(20));
         buttonContainer.add(btnAdmin);
 
-        // Center the container inside the left panel
-        leftPanel.add(buttonContainer, gbc);
 
-        return leftPanel;
+        btnNewGame.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("pantalla nuevo juego");
+
+                NewGameScreen screen = new NewGameScreen(leftPanel, rightPanel);
+//                server.addSubscriber();
+            }
+        });
+
+        btnSpectate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("Por ahora no hace nada el botón");
+
+                SpectatorScreen screen = new SpectatorScreen(leftPanel, rightPanel);
+//                server.addSubscriber();
+            }
+        });
+
+        btnAdmin.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("Por ahora no hace nada el botón");
+                AdminPanel screen = new AdminPanel(leftPanel, rightPanel);
+//                server.addSubscriber();
+            }
+        });
+        return buttonContainer;
     }
 
-
-
-
-    private JPanel createRightPanel() {
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setBackground(BLUE);
-
+    protected void createRightPanelContent() {
         ImageIcon icon = new ImageIcon("src/GUI/resources/main_screen_img.png");
         Image original = icon.getImage();
         Image scaled = original.getScaledInstance(
@@ -100,9 +89,8 @@ public class MainScreen {
 
         rightPanel.add(imgLabel, BorderLayout.CENTER);
 
-        return rightPanel;
     }
 
-    public void createGUI() {}
+
 
 }
