@@ -6,6 +6,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+
 import static App.Main.mainFrame;
 import static App.Main.server;
 
@@ -16,6 +18,7 @@ public class NewGameScreen extends TemplateScreen {
     private final JPanel previousRightPanel;
     private JTextField textField;
     private JButton btnStart;
+
 
 
     public NewGameScreen (JPanel leftPanel, JPanel rightPanel) {
@@ -60,10 +63,23 @@ public class NewGameScreen extends TemplateScreen {
             public void actionPerformed(ActionEvent e) {
                 System.out.println("Iniciooooooo");
 
-                Player player = new Player();
-                System.out.println(player.getClass());
 
-                server.addSubscriber(player);
+                String playerNamer = textField.getText();
+//                Player player = new Player(playerNamer, );
+//                System.out.println(player.getClass());
+                try {
+                    String command = "..\\Cliente\\cmake-build-debug\\cliente_tcp.exe";
+                    Process process = Runtime.getRuntime().exec(command);
+
+//                    int exitCode = process.waitFor();
+//                    System.out.println("Exited with code: " + exitCode);
+
+                } catch (IOException error) {
+//                } catch (IOException | InterruptedException error) {
+                    error.printStackTrace();
+                }
+
+//                server.addSubscriber(player);
             }
         });
 

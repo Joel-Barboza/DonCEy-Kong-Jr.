@@ -3,10 +3,10 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include "socket_thread.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-
+#include "cjson/cJSON.h"
 #include "widgets/button.h"
+#include "widgets/input_field.h"
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -24,7 +24,8 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
-static int connected = 0;
+extern int connected;
+
 
 // -----------------------------
 // Nivel: plataformas y lianas
@@ -222,7 +223,7 @@ void update_monkey_physics() {
     }
 }
 
-void handle_input(const Uint8* keyboard_state) {
+void handle_input(const _Bool* keyboard_state) {
     // Si está en una liana, manejar controles de escalada
     if (monkey.isOnVine) {
         monkey.velocityX = 0; // No movimiento horizontal en lianas
@@ -376,6 +377,40 @@ void draw_vines(SDL_Renderer* renderer) {
     }
 }
 
+
+void draw_game (SDL_Renderer *renderer, const _Bool* keyboard_state) {
+    // Manejar entrada del teclado
+    handle_input(keyboard_state);
+
+    // Actualizar física del mono
+    update_monkey_physics();
+
+    // Fondo negro
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    // Dibujar elementos del nivel
+    draw_platforms(renderer);
+    draw_vines(renderer);
+
+    // Dibujar el mono
+    draw_monkey(renderer);
+
+    // Dibujar botón
+    // draw_button(renderer, &btn);
+
+    SDL_RenderPresent(renderer);
+
+    SDL_Delay(16); // ~60 FPS
+}
+
+void draw_connect (SDL_Renderer *renderer, Button *btn, InputField *input_field) {
+
+    draw_input_field(renderer, input_field);
+    draw_button(renderer, btn);
+    SDL_RenderPresent(renderer);
+}
+
 // ---------------------------
 // Ventana y loop principal
 // ---------------------------
@@ -391,7 +426,7 @@ int window() {
         return -1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("Donkey Kong Jr - Mono Movible", 800, 600, 0);
+    SDL_Window *window = SDL_CreateWindow("Donkey Kong Jr", 800, 600, 0);
     if (!window) {
         SDL_Log("Window create failed: %s", SDL_GetError());
         TTF_Quit();
@@ -408,12 +443,15 @@ int window() {
         return -1;
     }
 
+    SDL_StartTextInput(window);
+
     TTF_Font *font = TTF_OpenFont("resources/arial.ttf", 20);
     if (!font) {
         SDL_Log("Failed to load font. Continuing without text.");
     }
 
-    Button btn = create_button(renderer, 300, 550, 200, 36, "Conectar", font ? font : NULL);
+    InputField input_field = create_input_field(300, 200, 200, 36, font ? font : NULL);
+    Button btn = create_button(renderer, 300, 250, 200, 36, "Conectar", font ? font : NULL);
 
     initialize_level_elements();
     initialize_monkey();
@@ -422,47 +460,80 @@ int window() {
     int running = 1;
     while (running) {
         // Obtener estado del teclado
-        const Uint8* keyboard_state = SDL_GetKeyboardState(NULL);
+        const _Bool* keyboard_state = SDL_GetKeyboardState(NULL);
 
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = 0;
 
+            // Handle input field events - FIXED FOR SDL3
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                // SDL3 uses different field names
+                float mouse_x, mouse_y;
+                SDL_GetMouseState(&mouse_x, &mouse_y);
+                // SDL_Log("Mouse click at (%f, %f)", mouse_x, mouse_y);
+
+                handle_input_field_click(&input_field, mouse_x, mouse_y);
+                // SDL_Log("Input field active: %d", input_field.is_active);
+            }
+            else if (e.type == SDL_EVENT_TEXT_INPUT) {
+                // SDL_Log("Text input: %s", e.text.text);
+                if (input_field.is_active) {
+                    handle_input_field_text(&input_field, e.text.text);
+                }
+            }
+            else if (e.type == SDL_EVENT_KEY_DOWN) {
+                if (e.key.key == SDLK_BACKSPACE && input_field.is_active) {
+                    // SDL_Log("Backspace pressed");
+                    handle_input_field_backspace(&input_field);
+                }
+                else if (e.key.key == SDLK_RETURN && input_field.is_active) {
+                    input_field.is_active = 0;
+                }
+            }
+
+            // Handle button events - UPDATE FOR SDL3
             if (button_handle_event(&btn, &e)) {
                 if (!connected) {
                     SDL_Log("Intentando conectar...");
-                    SDL_CreateThread(socket_thread, "SocketThread", NULL);
+                    SDL_Log("Nombre Jugador: %s", input_field.text);
+
+                    // Make a copy of the player name to avoid thread issues
+                    char *player_name = SDL_strdup(input_field.text);
+                    if (!player_name) {
+                        SDL_Log("Error copying player name");
+                        return 0; // or continue
+                    }
+
+                    // Start the socket thread with the player name
+                    SDL_Thread *thread = SDL_CreateThread(socket_thread, "SocketThread", (void*)player_name);
+                    if (!thread) {
+                        SDL_Log("Error creating socket thread");
+                        SDL_free(player_name);
+                    }
+                    // Don't send_message here - the socket thread should handle initial communication
+
                 } else {
                     SDL_Log("Reintentando conexión...");
-                    retry_connection();
+                    retry_connection("127.0.0.1"); // Or use a stored IP
                 }
             }
         }
 
-        // Manejar entrada del teclado
-        handle_input(keyboard_state);
 
-        // Actualizar física del mono
-        update_monkey_physics();
-
-        // Fondo negro
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
-        // Dibujar elementos del nivel
-        draw_platforms(renderer);
-        draw_vines(renderer);
+        if (!connected) {
+            draw_connect(renderer, &btn, &input_field);
+        } else {
+            draw_game(renderer, keyboard_state);
+        }
 
-        // Dibujar el mono
-        draw_monkey(renderer);
-
-        // Dibujar botón
-        draw_button(renderer, &btn);
-
-        SDL_RenderPresent(renderer);
-
-        SDL_Delay(16); // ~60 FPS
+        // SDL_RenderPresent(renderer);
     }
 
+    SDL_StopTextInput(window);
+    destroy_input_field(&input_field);
     destroy_button(&btn);
     if (font) TTF_CloseFont(font);
     TTF_Quit();

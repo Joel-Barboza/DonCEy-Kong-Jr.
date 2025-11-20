@@ -7,8 +7,11 @@
 #ifndef CLIENTETCP_SOCKET_THREAD_H
 #define CLIENTETCP_SOCKET_THREAD_H
 
-int connect_to_server(SOCKET sock, const char *ip, int port);
-int socket_thread();
-int retry_connection();
+int socket_thread(void *data);
+int send_message(const char *message);
+int receive_message(char *buffer, size_t buffer_size, int blocking);
+int is_connected();
+int retry_connection(const char *ip);
+void close_connection();
 
 #endif //CLIENTETCP_SOCKET_THREAD_H

@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Objects;
 
 import static App.Main.mainFrame;
 
@@ -21,11 +22,12 @@ public class MainScreen extends TemplateScreen {
         Dimension buttonSize = new Dimension(220, 50);         // fixed button size
 
         // Create buttons
-        JButton btnNewGame = new JButton("Nueva Partida");
+//        JButton btnNewGame = new JButton("Nueva Partida");
         JButton btnSpectate = new JButton("Espectar");
         JButton btnAdmin = new JButton("Administrar Partidas");
 
-        JButton[] buttons = { btnNewGame, btnSpectate, btnAdmin };
+//        JButton[] buttons = { btnNewGame, btnSpectate, btnAdmin };
+        JButton[] buttons = { btnSpectate, btnAdmin };
 
         for (JButton b : buttons) {
             b.setBackground(YELLOW);                            // custom background color
@@ -38,28 +40,28 @@ public class MainScreen extends TemplateScreen {
         }
 
         // Add buttons with spacing between them
-        buttonContainer.add(btnNewGame);
-        buttonContainer.add(Box.createVerticalStrut(20));       // vertical spacing
+//        buttonContainer.add(btnNewGame);
+//        buttonContainer.add(Box.createVerticalStrut(20));       // vertical spacing
         buttonContainer.add(btnSpectate);
         buttonContainer.add(Box.createVerticalStrut(20));
         buttonContainer.add(btnAdmin);
 
 
-        btnNewGame.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                System.out.println("pantalla nuevo juego");
-
-                mainFrame.remove(leftPanel);
-                mainFrame.remove(rightPanel);
-
-                new NewGameScreen(leftPanel, rightPanel);
-
-                mainFrame.revalidate();
-                mainFrame.repaint();
-//                server.addSubscriber();
-            }
-        });
+//        btnNewGame.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                System.out.println("pantalla nuevo juego");
+//
+//                mainFrame.remove(leftPanel);
+//                mainFrame.remove(rightPanel);
+//
+//                new NewGameScreen(leftPanel, rightPanel);
+//
+//                mainFrame.revalidate();
+//                mainFrame.repaint();
+////                server.addSubscriber();
+//            }
+//        });
 
         btnSpectate.addActionListener(new ActionListener() {
             @Override
@@ -97,7 +99,9 @@ public class MainScreen extends TemplateScreen {
     }
 
     protected void createRightPanelContent() {
-        ImageIcon icon = new ImageIcon("src/GUI/resources/main_screen_img.png");
+        ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/main_screen_img.png")));
+
+//        ImageIcon icon = new ImageIcon("src/GUI/resources/main_screen_img.png");
         Image original = icon.getImage();
         Image scaled = original.getScaledInstance(
                 original.getWidth(icon.getImageObserver())/2,
