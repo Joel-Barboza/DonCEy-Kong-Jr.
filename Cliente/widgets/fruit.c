@@ -24,8 +24,7 @@ Fruit create_peach(int x, int y) {
 
 Fruit create_fruit(int type, int x, int y) {
     Fruit fruit;
-    fruit.x = x-20;
-    fruit.y = y-20;
+    fruit.rect = (SDL_FRect){x-20, y-20, 40, 40};
     fruit.type = type;
     fruit.texture = NULL;
 
@@ -57,9 +56,8 @@ Fruit create_fruit(int type, int x, int y) {
 }
 
 void draw_fruit(Fruit* fruit) {
-    const SDL_FRect rect = {fruit->x-20, fruit->y-20, 40, 40};
     if (fruit->texture) {
-        SDL_RenderTexture(renderer, fruit->texture, NULL, &rect);
+        SDL_RenderTexture(renderer, fruit->texture, NULL, &fruit->rect);
     } else {
         // Fallback: draw a colored rectangle if texture failed to load
         SDL_Color color;
@@ -70,7 +68,7 @@ void draw_fruit(Fruit* fruit) {
             default: color = (SDL_Color){250, 10, 23, 255}; break;
         }
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_RenderFillRect(renderer, &fruit->rect);
     }
 }
 

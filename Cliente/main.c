@@ -1,4 +1,5 @@
 #define SDL_MAIN_HANDLED
+#include <float.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "socket_thread.h"
@@ -10,22 +11,22 @@
 #include "constants.h"
 
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-    #define close closesocket
-    #define read(s, b, l) recv(s, b, l, 0)
-    #define write(s, b, l) send(s, b, l, 0)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#define close closesocket
+#define read(s, b, l) recv(s, b, l, 0)
+#define write(s, b, l) send(s, b, l, 0)
 #else
-    #include <unistd.h>
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #endif
 
 
 extern int connected;
-SDL_Renderer* renderer;
+SDL_Renderer *renderer;
 
 
 // -----------------------------
@@ -49,9 +50,11 @@ typedef struct {
     float velocityY;
     int isOnGround;
     int facingRight;
-    int isOnVine;        // Nuevo: indica si está en una liana
-    int currentVine;     // Nuevo: índice de la liana actual
-    float vineOffsetX;   // Nuevo: offset horizontal en la liana
+    int isOnVine; // Nuevo: indica si está en una liana
+    int currentVine; // Nuevo: índice de la liana actual
+    float vineOffsetX; // Nuevo: offset horizontal en la liana
+    int wantToJumpLeft;
+    int wantToJumpRight;
 } Monkey;
 
 Monkey monkey;
@@ -60,39 +63,39 @@ Monkey monkey;
 const float GRAVITY = 0.5f;
 const float JUMP_FORCE = -10.0f;
 const float MOVE_SPEED = 3.0f;
-const float CLIMB_SPEED = 2.5f;  // Nuevo: velocidad de escalada
+const float CLIMB_SPEED = 2.5f; // Nuevo: velocidad de escalada
 
 void initialize_level_elements() {
-    platforms[0] = (SDL_FRect){ 20.0f,  60.0f, 400.0f, 18.0f };
-    platforms[1] = (SDL_FRect){ 400.0f,  80.0f, 250.0f, 18.0f };
-    platforms[2] = (SDL_FRect){ 600.0f,  300.0f, 250.0f, 18.0f };
-    platforms[3] = (SDL_FRect){ 200.0f,  200.0f, 100.0f, 18.0f };
-    platforms[4] = (SDL_FRect){ 200.0f,  310.0f, 200.0f, 18.0f };
-    platforms[5] = (SDL_FRect){ 20.0f,  490.0f, 200.0f, 18.0f };
-    platforms[6] = (SDL_FRect){ 380.0f,  430.0f, 100.0f, 18.0f };
-    platforms[7] = (SDL_FRect){ 510.0f,  460.0f, 100.0f, 18.0f };
-    platforms[8] = (SDL_FRect){ 670.0f,  440.0f, 100.0f, 18.0f };
+    platforms[0] = (SDL_FRect){20.0f, 60.0f, 400.0f, 18.0f};
+    platforms[1] = (SDL_FRect){400.0f, 80.0f, 250.0f, 18.0f};
+    platforms[2] = (SDL_FRect){600.0f, 300.0f, 250.0f, 18.0f};
+    platforms[3] = (SDL_FRect){200.0f, 200.0f, 100.0f, 18.0f};
+    platforms[4] = (SDL_FRect){200.0f, 310.0f, 200.0f, 18.0f};
+    platforms[5] = (SDL_FRect){20.0f, 490.0f, 200.0f, 18.0f};
+    platforms[6] = (SDL_FRect){380.0f, 430.0f, 100.0f, 18.0f};
+    platforms[7] = (SDL_FRect){510.0f, 460.0f, 100.0f, 18.0f};
+    platforms[8] = (SDL_FRect){670.0f, 440.0f, 100.0f, 18.0f};
 
-    vines[0]  = (SDL_FRect){  80.0f,  78.0f, 6.0f,  300.0f };
-    vines[1]  = (SDL_FRect){ 150.0f,  78.0f, 6.0f,  300.0f };
-    vines[2]  = (SDL_FRect){ 280.0f,  200.0f, 6.0f,  200.0f };
-    vines[3]  = (SDL_FRect){ 430.0f,  98.0f, 6.0f,  300.0f };
-    vines[4]  = (SDL_FRect){ 480.0f,  98.0f, 6.0f,  200.0f };
-    vines[5]  = (SDL_FRect){ 530.0f,  98.0f, 6.0f,  300.0f };
-    vines[6]  = (SDL_FRect){ 590.0f,  98.0f, 6.0f,  260.0f };
-    vines[7]  = (SDL_FRect){  680.0f,  30.0f, 6.0f,  380.0f };
-    vines[8]  = (SDL_FRect){ 750.0f,  30.0f, 6.0f,  380.0f };
+    vines[0] = (SDL_FRect){80.0f, 78.0f, 6.0f, 300.0f};
+    vines[1] = (SDL_FRect){150.0f, 78.0f, 6.0f, 300.0f};
+    vines[2] = (SDL_FRect){280.0f, 200.0f, 6.0f, 200.0f};
+    vines[3] = (SDL_FRect){430.0f, 98.0f, 6.0f, 300.0f};
+    vines[4] = (SDL_FRect){480.0f, 98.0f, 6.0f, 200.0f};
+    vines[5] = (SDL_FRect){530.0f, 98.0f, 6.0f, 300.0f};
+    vines[6] = (SDL_FRect){590.0f, 98.0f, 6.0f, 260.0f};
+    vines[7] = (SDL_FRect){680.0f, 30.0f, 6.0f, 380.0f};
+    vines[8] = (SDL_FRect){750.0f, 30.0f, 6.0f, 380.0f};
 }
 
 void initialize_monkey() {
     // Posición inicial del mono (sobre la primera plataforma)
-    monkey.rect = (SDL_FRect){ 50.0f, 470.0f, 24.0f, 32.0f };
+    monkey.rect = (SDL_FRect){50.0f, 470.0f, 24.0f, 32.0f};
     monkey.velocityX = 0.0f;
     monkey.velocityY = 0.0f;
     monkey.isOnGround = 0;
     monkey.facingRight = 1;
-    monkey.isOnVine = 0;      // Inicialmente no está en liana
-    monkey.currentVine = -1;  // Sin liana actual
+    monkey.isOnVine = 0; // Inicialmente no está en liana
+    monkey.currentVine = -1; // Sin liana actual
     monkey.vineOffsetX = 0.0f;
 }
 
@@ -106,7 +109,6 @@ int check_vine_collision() {
             monkey.rect.x + monkey.rect.w > v.x &&
             monkey.rect.y < v.y + v.h &&
             monkey.rect.y + monkey.rect.h > v.y) {
-
             // El mono está tocando una liana
             return i;
         }
@@ -138,9 +140,8 @@ void update_monkey_physics() {
             for (int i = 0; i < NUM_PLATFORMS; i++) {
                 if (monkey.rect.x < platforms[i].x + platforms[i].w &&
                     monkey.rect.x + monkey.rect.w > platforms[i].x &&
-                    monkey.rect.y + monkey.rect.h <= platforms[i].y + 5 &&  // Cerca de la plataforma
+                    monkey.rect.y + monkey.rect.h <= platforms[i].y + 5 && // Cerca de la plataforma
                     monkey.rect.y + monkey.rect.h >= platforms[i].y) {
-
                     // Salir de la liana y colocarse sobre la plataforma
                     monkey.isOnVine = 0;
                     monkey.currentVine = -1;
@@ -169,7 +170,6 @@ void update_monkey_physics() {
             monkey.rect.x + monkey.rect.w > platforms[i].x &&
             monkey.rect.y < platforms[i].y + platforms[i].h &&
             monkey.rect.y + monkey.rect.h > platforms[i].y) {
-
             if (monkey.velocityX > 0) {
                 // Colisión por la derecha
                 monkey.rect.x = platforms[i].x - monkey.rect.w;
@@ -191,7 +191,6 @@ void update_monkey_physics() {
             monkey.rect.x + monkey.rect.w > platforms[i].x &&
             monkey.rect.y < platforms[i].y + platforms[i].h &&
             monkey.rect.y + monkey.rect.h > platforms[i].y) {
-
             if (monkey.velocityY > 0) {
                 // Colisión por abajo (cayendo sobre plataforma)
                 monkey.rect.y = platforms[i].y - monkey.rect.h;
@@ -225,72 +224,207 @@ void update_monkey_physics() {
         monkey.velocityX *= 0.8f;
         if (SDL_fabsf(monkey.velocityX) < 0.5f) monkey.velocityX = 0;
     }
+
+    for (int i = 0; i < fruit_count; i++) {
+        if (monkey.rect.x < fruits[i].rect.x + fruits[i].rect.w &&
+            monkey.rect.x + monkey.rect.w > fruits[i].rect.x &&
+            monkey.rect.y < fruits[i].rect.y + fruits[i].rect.h &&
+            monkey.rect.y + monkey.rect.h > fruits[i].rect.y) {
+            // Destroy resources
+            destroy_fruit(&fruits[i]);
+
+            // Shift items to fill the gap
+            for (int j = i; j < fruit_count - 1; j++) {
+                fruits[j] = fruits[j + 1];
+            }
+
+            fruit_count--;
+
+            // since we removed index i, stay at same i
+            i--;
+        }
+    }
 }
 
-void handle_input(const _Bool* keyboard_state) {
-    // Si está en una liana, manejar controles de escalada
-    if (monkey.isOnVine) {
-        monkey.velocityX = 0; // No movimiento horizontal en lianas
+// direction: -1 = left, +1 = right
+// max_horiz = max horizontal distance monkey can reach (e.g. 120)
+// grab_margin = how far above/below vine center the monkey may grab (e.g. 40)
+int find_nearby_vine_in_direction(float monkey_center_x, float monkey_top_y, float monkey_bottom_y,
+                                  int direction, float max_horiz, float grab_margin) {
+    int best = -1;
+    float best_dx = FLT_MAX;
 
-        // Escalada hacia arriba y abajo
-        if (keyboard_state[SDL_SCANCODE_UP]) {
-            monkey.velocityY = -CLIMB_SPEED;
-        }
-        else if (keyboard_state[SDL_SCANCODE_DOWN]) {
-            monkey.velocityY = CLIMB_SPEED;
-        }
-        else {
-            monkey.velocityY = 0; // No moverse si no se presiona nada
+    for (int i = 0; i < NUM_VINES; i++) {
+        SDL_FRect v = vines[i];
+
+        // vine center X
+        float vine_cx = v.x + v.w * 0.5f;
+
+        // horizontal displacement from monkey center to vine center, signed
+        float dx = vine_cx - monkey_center_x;
+
+        // must be in the requested direction
+        if (direction > 0 && dx <= 0) continue;
+        if (direction < 0 && dx >= 0) continue;
+
+        // absolute horizontal distance must be reachable
+        if (SDL_fabsf(dx) > max_horiz) continue;
+
+        // vertical overlap: monkey should be able to grab somewhere on the vine.
+        // allow if monkey's vertical span intersects vine span +/- grab_margin
+        float vine_top = v.y - grab_margin;
+        float vine_bottom = v.y + v.h + grab_margin;
+
+        if ((monkey_bottom_y < vine_top) || (monkey_top_y > vine_bottom)) {
+            // no vertical overlap
+            continue;
         }
 
-        // Salto para soltarse de la liana
-        if (keyboard_state[SDL_SCANCODE_LEFT] || keyboard_state[SDL_SCANCODE_RIGHT]) {
-            monkey.isOnVine = 0;
-            monkey.currentVine = -1;
-            monkey.velocityY = 0;
-            // Dar un pequeño impulso en la dirección presionada
-            if (keyboard_state[SDL_SCANCODE_LEFT]) {
-                monkey.velocityX = -MOVE_SPEED * 0.5f;
-                monkey.facingRight = 0;
-            } else {
-                monkey.velocityX = MOVE_SPEED * 0.5f;
-                monkey.facingRight = 1;
-            }
+        // prefer the closest horizontal candidate
+        if (SDL_fabsf(dx) < best_dx) {
+            best_dx = SDL_fabsf(dx);
+            best = i;
         }
+    }
+    return best;
+}
 
+/* Helper function to keep monkey within vine boundaries */
+void clamp_monkey_to_vine(int vineIndex) {
+    float vTop = vines[vineIndex].y;
+    float vBottom = vines[vineIndex].y + vines[vineIndex].h;
+
+    if (monkey.rect.y < vTop)
+        monkey.rect.y = vTop;
+    if (monkey.rect.y + monkey.rect.h > vBottom)
+        monkey.rect.y = vBottom - monkey.rect.h;
+}
+
+
+/* Helper function to attach monkey to a vine with perfect horizontal centering */
+void attach_to_vine(int vineIndex) {
+    monkey.isOnVine = 1;
+    monkey.currentVine = vineIndex;
+    monkey.velocityX = 0;
+    monkey.velocityY = 0;
+
+    /* Perfect horizontal centering on the vine */
+    float vineCenterX = vines[vineIndex].x + vines[vineIndex].w * 0.5f;
+    float monkeyHalfWidth = monkey.rect.w * 0.5f;
+    monkey.rect.x = vineCenterX - monkeyHalfWidth;
+
+    /* Initialize vineOffsetX to maintain this centered position */
+    monkey.vineOffsetX = monkey.rect.x - vines[vineIndex].x;
+
+    /* Ensure monkey stays within vine bounds vertically */
+    clamp_monkey_to_vine(vineIndex);
+}
+
+/* Handle detaching from vine with movement */
+void detach_from_vine(const _Bool *keyboard_state) {
+    monkey.isOnVine = 0;
+    monkey.currentVine = -1;
+
+    if (keyboard_state[SDL_SCANCODE_LEFT]) {
+        monkey.velocityX = -MOVE_SPEED * 0.6f;
+        monkey.facingRight = 0;
+    } else {
+        monkey.velocityX = MOVE_SPEED * 0.6f;
+        monkey.facingRight = 1;
+    }
+}
+
+/* Handle vine-to-vine jumping logic */
+void handle_vine_jump(const _Bool *keyboard_state) {
+    int dir = (keyboard_state[SDL_SCANCODE_RIGHT]) ? 1 : (keyboard_state[SDL_SCANCODE_LEFT]) ? -1 : 0;
+
+    if (dir == 0) return; // No direction specified
+
+    float mcx = monkey.rect.x - monkey.rect.w * 0.5f;
+    float top = monkey.rect.y;
+    float bot = monkey.rect.y + monkey.rect.h;
+
+    int target = find_nearby_vine_in_direction(mcx, top, bot, dir, 140.0f, 32.0f);
+
+    if (target >= 0) {
+        /* Successfully found target vine - attach to it */
+        attach_to_vine(target);
+    } else {
+        /* No vine found - perform regular jump */
+        monkey.isOnVine = 0;
+        monkey.currentVine = -1;
+        monkey.velocityY = -9.0f;
+        monkey.velocityX = dir * 5.0f;
+    }
+}
+
+/* Handle all input while monkey is on a vine */
+void handle_vine_input(const _Bool *keyboard_state) {
+    monkey.velocityX = 0; // No horizontal movement on vines
+
+    /* Climbing with UP/DOWN */
+    if (keyboard_state[SDL_SCANCODE_UP])
+        monkey.velocityY = -CLIMB_SPEED;
+    else if (keyboard_state[SDL_SCANCODE_DOWN])
+        monkey.velocityY = CLIMB_SPEED;
+    else
+        monkey.velocityY = 0;
+
+    /* Detach with left/right movement */
+    if (keyboard_state[SDL_SCANCODE_LEFT] || keyboard_state[SDL_SCANCODE_RIGHT]) {
+        detach_from_vine(keyboard_state);
         return;
     }
 
-    // Movimiento normal (cuando no está en liana)
+    /* Vine-to-vine jump */
+    if (keyboard_state[SDL_SCANCODE_SPACE]) {
+        handle_vine_jump(keyboard_state);
+    }
+}
 
-    // Movimiento horizontal
+/* Handle normal ground movement */
+void handle_ground_movement(const _Bool *keyboard_state) {
+    /* Horizontal movement */
     if (keyboard_state[SDL_SCANCODE_LEFT]) {
         monkey.velocityX = -MOVE_SPEED;
         monkey.facingRight = 0;
-    }
-    else if (keyboard_state[SDL_SCANCODE_RIGHT]) {
+    } else if (keyboard_state[SDL_SCANCODE_RIGHT]) {
         monkey.velocityX = MOVE_SPEED;
         monkey.facingRight = 1;
     }
 
-    // Salto
-    if (keyboard_state[SDL_SCANCODE_UP] && monkey.isOnGround) {
+    /* Jump */
+    if (keyboard_state[SDL_SCANCODE_SPACE] && monkey.isOnGround) {
         monkey.velocityY = JUMP_FORCE;
         monkey.isOnGround = 0;
     }
+}
 
-    // Verificar si puede agarrarse a una liana (cuando salta cerca de una)
-    if (!monkey.isOnGround && keyboard_state[SDL_SCANCODE_UP]) {
+void handle_input(const _Bool *keyboard_state) {
+    /* -------------------------------------------------------
+       1. If NOT on a vine, check if we should grab one
+       ------------------------------------------------------- */
+    if (!monkey.isOnVine && !keyboard_state[SDL_SCANCODE_SPACE]) {
         int vineIndex = check_vine_collision();
+
         if (vineIndex != -1) {
-            monkey.isOnVine = 1;
-            monkey.currentVine = vineIndex;
-            monkey.velocityY = 0;
-            monkey.velocityX = 0;
-            // Calcular offset para centrarse en la liana
-            monkey.vineOffsetX = (vines[vineIndex].w - monkey.rect.w) / 2.0f;
+            attach_to_vine(vineIndex);
+            return;
         }
     }
+
+    /* -------------------------------------------------------
+       2. If ON a vine: handle vine-specific input
+       ------------------------------------------------------- */
+    if (monkey.isOnVine) {
+        handle_vine_input(keyboard_state);
+        return; // Always return after handling vine input
+    }
+
+    /* -------------------------------------------------------
+       3. Normal ground movement (only reached when not on vine)
+       ------------------------------------------------------- */
+    handle_ground_movement(keyboard_state);
 }
 
 void draw_monkey() {
@@ -315,13 +449,13 @@ void draw_monkey() {
     // Ojos
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     if (monkey.facingRight) {
-        SDL_FRect eye1 = { monkey.rect.x + 14, monkey.rect.y + 10, 3, 3 };
-        SDL_FRect eye2 = { monkey.rect.x + 18, monkey.rect.y + 10, 3, 3 };
+        SDL_FRect eye1 = {monkey.rect.x + 14, monkey.rect.y + 10, 3, 3};
+        SDL_FRect eye2 = {monkey.rect.x + 18, monkey.rect.y + 10, 3, 3};
         SDL_RenderFillRect(renderer, &eye1);
         SDL_RenderFillRect(renderer, &eye2);
     } else {
-        SDL_FRect eye1 = { monkey.rect.x + 7, monkey.rect.y + 10, 3, 3 };
-        SDL_FRect eye2 = { monkey.rect.x + 11, monkey.rect.y + 10, 3, 3 };
+        SDL_FRect eye1 = {monkey.rect.x + 7, monkey.rect.y + 10, 3, 3};
+        SDL_FRect eye2 = {monkey.rect.x + 11, monkey.rect.y + 10, 3, 3};
         SDL_RenderFillRect(renderer, &eye1);
         SDL_RenderFillRect(renderer, &eye2);
     }
@@ -335,14 +469,14 @@ void draw_platform_rect(SDL_FRect r) {
 
     // borde superior (línea brillante)
     SDL_SetRenderDrawColor(renderer, 250, 150, 60, 255);
-    SDL_FRect top = { r.x, r.y, r.w, 4 };
+    SDL_FRect top = {r.x, r.y, r.w, 4};
     SDL_RenderFillRect(renderer, &top);
 
     // líneas horizontales decorativas (simular ladrillos)
     SDL_SetRenderDrawColor(renderer, 170, 90, 40, 255);
     float brick_h = 4.0f;
     for (float bx = r.x + 6.0f; bx + 20.0f < r.x + r.w; bx += 26.0f) {
-        SDL_FRect brick = { bx, r.y + 6.0f, 20.0f, brick_h };
+        SDL_FRect brick = {bx, r.y + 6.0f, 20.0f, brick_h};
         SDL_RenderFillRect(renderer, &brick);
     }
 }
@@ -369,13 +503,13 @@ void draw_vines() {
         SDL_SetRenderDrawColor(renderer, 20, 120, 20, 255);
         float knot_step = 28.0f;
         for (float y = v.y + 10.0f; y < v.y + v.h; y += knot_step) {
-            SDL_FRect knot = { v.x - 5.0f, y, v.w + 10.0f, 4.0f };
+            SDL_FRect knot = {v.x - 5.0f, y, v.w + 10.0f, 4.0f};
             SDL_RenderFillRect(renderer, &knot);
         }
 
         if (v.h > 200.0f) {
             SDL_SetRenderDrawColor(renderer, 30, 160, 40, 255);
-            SDL_FRect leaf = { v.x - 8.0f, v.y + v.h - 8.0f, v.w + 16.0f, 6.0f };
+            SDL_FRect leaf = {v.x - 8.0f, v.y + v.h - 8.0f, v.w + 16.0f, 6.0f};
             SDL_RenderFillRect(renderer, &leaf);
         }
     }
@@ -396,7 +530,7 @@ void destroy_fruits() {
     }
 };
 
-void draw_game (const _Bool* keyboard_state) {
+void draw_game(const _Bool *keyboard_state) {
     // Manejar entrada del teclado
     handle_input(keyboard_state);
 
@@ -423,8 +557,7 @@ void draw_game (const _Bool* keyboard_state) {
     SDL_Delay(16); // ~60 FPS
 }
 
-void draw_connect (Button *btn, InputField *input_field) {
-
+void draw_connect(Button *btn, InputField *input_field) {
     draw_input_field(input_field);
     draw_button(btn);
     SDL_RenderPresent(renderer);
@@ -502,7 +635,7 @@ int window() {
     int running = 1;
     while (running) {
         // Obtener estado del teclado
-        const _Bool* keyboard_state = SDL_GetKeyboardState(NULL);
+        const _Bool *keyboard_state = SDL_GetKeyboardState(NULL);
 
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = 0;
@@ -516,19 +649,16 @@ int window() {
 
                 handle_input_field_click(&input_field, mouse_x, mouse_y);
                 // SDL_Log("Input field active: %d", input_field.is_active);
-            }
-            else if (e.type == SDL_EVENT_TEXT_INPUT) {
+            } else if (e.type == SDL_EVENT_TEXT_INPUT) {
                 // SDL_Log("Text input: %s", e.text.text);
                 if (input_field.is_active) {
                     handle_input_field_text(&input_field, e.text.text);
                 }
-            }
-            else if (e.type == SDL_EVENT_KEY_DOWN) {
+            } else if (e.type == SDL_EVENT_KEY_DOWN) {
                 if (e.key.key == SDLK_BACKSPACE && input_field.is_active) {
                     // SDL_Log("Backspace pressed");
                     handle_input_field_backspace(&input_field);
-                }
-                else if (e.key.key == SDLK_RETURN && input_field.is_active) {
+                } else if (e.key.key == SDLK_RETURN && input_field.is_active) {
                     input_field.is_active = 0;
                     handle_connection(input_field);
                 }

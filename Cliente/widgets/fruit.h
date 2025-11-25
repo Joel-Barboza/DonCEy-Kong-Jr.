@@ -15,8 +15,7 @@
 // } Fruit;
 
 typedef struct {
-    int x;
-    int y;
+    SDL_FRect rect;
     SDL_Texture* texture;
     int type; // 0 = apple, 1 = banana, 2 = peach
 } Fruit;

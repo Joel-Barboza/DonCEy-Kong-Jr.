@@ -24,8 +24,9 @@ public class AdminScreen extends TemplateScreen {
     private Timer subscriberRefreshTimer;
     private ButtonGroup fruitGroup;
     private ButtonGroup radioVinesGroup;
-    private static final ArrayList<JSlider> sliderHeightList = new ArrayList<>();
     private static JSlider selectedSlider;
+    private static JButton btnSend;
+    private static final ArrayList<JSlider> sliderHeightList = new ArrayList<>();
     private static final ArrayList<Integer[]> vineList = new ArrayList<>(List.of(
             new Integer[]{80, 78, 6, 300},
             new Integer[]{150, 78, 6, 300},
@@ -177,10 +178,7 @@ public class AdminScreen extends TemplateScreen {
         leftPanel.setLayout(new GridBagLayout());
 
         GridBagConstraints gbc = new GridBagConstraints();
-//        gbc.insets = new Insets(10, 0, 10, 0);     // spacing between rows
-//        gbc.fill = GridBagConstraints.VERTICAL;
         gbc.weightx = 1.0;
-
 
         JLabel fruitsLabel = new JLabel("Select fruit:");
         fruitsLabel.setFont(BUTTON_FONT);
@@ -202,7 +200,6 @@ public class AdminScreen extends TemplateScreen {
         gbc.gridx = 0;
         gbc.gridy = 1;
         leftPanel.add(rbAppleImg,gbc);
-
 
         ImageIcon peachIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/peach.png")));
         JRadioButton rbPeachImg = createFruitRadio(peachIcon);
@@ -229,7 +226,6 @@ public class AdminScreen extends TemplateScreen {
             updateVinesVisibility();
         };
 
-
         rbAppleImg.setActionCommand("0");   // apple
         rbPeachImg.setActionCommand("1");   // peach
         rbBananaImg.setActionCommand("2");  // banana
@@ -238,11 +234,12 @@ public class AdminScreen extends TemplateScreen {
         rbPeachImg.addActionListener(listener);
         rbBananaImg.addActionListener(listener);
 
-
-        JButton btnSend = new JButton("Send");
+        btnSend = new JButton("Send");
         setButtonStyle(btnSend);
+        btnSend.setEnabled(false);
         JButton btnBack = new JButton("Volver");
         setButtonStyle(btnBack);
+
         btnSend.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -254,11 +251,10 @@ public class AdminScreen extends TemplateScreen {
                 Integer heightValue = selectedSlider.getValue();
                 System.out.println(heightValue);
 
-//                JSONArray array = new JSONArray();
                 JSONObject rectObject = new JSONObject();
                 rectObject.put("type", Integer.parseInt(fruitGroup.getSelection().getActionCommand()));
-                rectObject.put("x", vineList.get(selectedVine)[0] + 23);
-                rectObject.put("y", vineList.get(selectedVine)[1] + heightValue + 21);
+                rectObject.put("x", vineList.get(selectedVine)[0]+3);
+                rectObject.put("y", vineList.get(selectedVine)[1] + heightValue);
                 rectObject.put("width", vineList.get(selectedVine)[2]);
                 rectObject.put("height", vineList.get(selectedVine)[3]);
                 JSONObject obj = new JSONObject();
@@ -271,14 +267,15 @@ public class AdminScreen extends TemplateScreen {
                 selectedSlider.setVisible(false);
                 selectedSlider = null;
                 updateVinesVisibility();
-
+                btnSend.setEnabled(false);
             }
         });
+
         gbc.fill = GridBagConstraints.CENTER;
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 3;
-
+        leftPanel.add(btnSend, gbc);  // Add Send button at row 2
 
         btnBack.addActionListener(new ActionListener() {
             @Override
@@ -302,13 +299,9 @@ public class AdminScreen extends TemplateScreen {
         });
 
         gbc.gridx = 0;
-        gbc.gridy = 4;
+        gbc.gridy = 3;
         gbc.gridwidth = 3;
-//        leftPanel.add(btnBack, gbc);
-        leftPanel.add(btnSend, gbc);
-
-
-
+        leftPanel.add(btnBack, gbc);  // Add Back button at row 3
     }
 
     private void updateVinesVisibility() {
@@ -352,24 +345,6 @@ public class AdminScreen extends TemplateScreen {
         imgLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         imgLabel.setForeground(Color.WHITE);
 
-
-
-//        JSlider slider = new JSlider(SwingConstants.VERTICAL);
-//        slider.setBounds(calcBounds(680, 30, 6, 380));
-//        slider.setBounds(calcBounds(750, 30, 6, 380));
-//        slider.setBounds (calcBounds(280, 200, 6, 200));
-//        slider.setBounds(calcBounds(80,  78, 6, 300));
-//        slider.setBounds(calcBounds(150, 78, 6, 300));
-//        slider.setBounds(calcBounds(430, 98, 6, 300));
-//        slider.setBounds(calcBounds(480, 98, 6, 200));
-//        slider.setBounds(calcBounds(590, 98, 6, 260));
-//        slider.setBounds(calcBounds(530, 98, 6, 300));
-
-//        vine1.setBounds(calcBounds(80,  78, 6, 300));
-
-
-
-
         ActionListener listener = e -> {
             JRadioButton source = (JRadioButton) e.getSource();
             System.out.println("Selected vine: " + source.getName());
@@ -378,6 +353,7 @@ public class AdminScreen extends TemplateScreen {
             }
             selectedSlider = sliderHeightList.get(Integer.parseInt(source.getName()));
             selectedSlider.setVisible(true);
+            btnSend.setEnabled(true);
 
 
         };
