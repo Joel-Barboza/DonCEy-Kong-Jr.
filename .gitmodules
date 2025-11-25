@@ -10,3 +10,6 @@
 [submodule "Cliente/vendored/cJSON"]
 	path = Cliente/vendored/cJSON
 	url = https://github.com/DaveGamble/cJSON
+[submodule "Cliente/vendored/SDL_image"]
+	path = Cliente/vendored/SDL_image
+	url = https://github.com/libsdl-org/SDL_image.git
