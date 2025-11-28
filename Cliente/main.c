@@ -78,6 +78,8 @@ void initialize_level_elements() {
     platforms[6] = (SDL_FRect){380.0f, 430.0f, 100.0f, 18.0f};
     platforms[7] = (SDL_FRect){510.0f, 460.0f, 100.0f, 18.0f};
     platforms[8] = (SDL_FRect){670.0f, 440.0f, 100.0f, 18.0f};
+    platforms[9] = (SDL_FRect){20.0f, 10.0f, 100.0f, 10.0f};
+    //platforms[10] = (SDL_FRect){670.0f, 440.0f, 100.0f, 18.0f};
 
     vines[0] = (SDL_FRect){80.0f, 78.0f, 6.0f, 300.0f};
     vines[1] = (SDL_FRect){150.0f, 78.0f, 6.0f, 300.0f};
@@ -88,6 +90,9 @@ void initialize_level_elements() {
     vines[6] = (SDL_FRect){590.0f, 98.0f, 6.0f, 260.0f};
     vines[7] = (SDL_FRect){680.0f, 30.0f, 6.0f, 380.0f};
     vines[8] = (SDL_FRect){750.0f, 30.0f, 6.0f, 380.0f};
+    vines[9] = (SDL_FRect){20.0f, 20.0f, 6.0f, 40.0f};
+    vines[10] = (SDL_FRect){70.0f, 20.0f, 6.0f, 40.0f};
+    vines[11] = (SDL_FRect){110.0f, 20.0f, 6.0f, 40.0f};
 }
 
 void initialize_monkey() {
@@ -158,7 +163,26 @@ void update_monkey_physics() {
 
         return; // Saltar el resto de la física normal cuando está en liana
     }
-
+    if (monkey.rect.x <= 140.0f && monkey.rect.y <= 30.0f) {
+        // Regresar a la posición inicial
+        monkey.rect.x = 50.0f;
+        monkey.rect.y = 470.0f;
+        monkey.velocityX = 0.0f;
+        monkey.velocityY = 0.0f;
+        monkey.isOnGround = 1;
+        monkey.isOnVine = 0;
+        monkey.currentVine = -1;
+    }
+    if (monkey.rect.y >= 500.0f) {
+        // Regresar a la posición inicial
+        monkey.rect.x = 50.0f;
+        monkey.rect.y = 470.0f;
+        monkey.velocityX = 0.0f;
+        monkey.velocityY = 0.0f;
+        monkey.isOnGround = 1;
+        monkey.isOnVine = 0;
+        monkey.currentVine = -1;
+    }
     // Física normal (cuando no está en liana)
 
     // Aplicar gravedad
