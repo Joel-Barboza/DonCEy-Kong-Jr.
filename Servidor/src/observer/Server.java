@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONString;
 
 public class Server {
     // singleton instance
@@ -142,14 +145,28 @@ public class Server {
 
             String inputLine;
             while ((inputLine = reader.readLine()) != null) {
-                System.out.println("Cliente dice: " + inputLine);
+//                System.out.println("Cliente dice: " + inputLine);
                 JSONObject obj = new JSONObject(inputLine);
 
-                if (obj.has("name") && Objects.equals(obj.getString("type"), "PLAYER")) {
-                    String name = obj.getString("name");
-                    System.out.println("Name = " + name);
-                    Player player = new Player(name, clientSocket, reader, writer);
-                    subscribers.add(player);
+                if (obj.has("msg_type") && Objects.equals(obj.getString("msg_type"), "subs_type")) {
+                    String type = obj.getString("type");
+                    System.out.println("type = " + type);
+                    if (Objects.equals(type, "PLAYER")) {
+                        String name = obj.getString("name");
+                        Player player = new Player(name, clientSocket, reader, writer);
+                        subscribers.add(player);
+                    } else {
+                        Viewer spectator = new Viewer(clientSocket, reader, writer);
+                        subscribers.add(spectator);
+                    }
+                } else if (obj.has("msg_type") && Objects.equals(obj.getString("msg_type"), "request_players")){
+                    String jsonPlayerList = getPlayerListJSON();
+                    System.out.println("requested player list");
+                    if (jsonPlayerList != null) {
+//                        System.out.println(jsonPlayerList);
+                        writer.println(jsonPlayerList);
+                    };
+
                 }
 
                 if ("quit".equalsIgnoreCase(inputLine)) {
@@ -157,7 +174,7 @@ public class Server {
                     break;
                 }
 
-                writer.println("Servidor recibió: " + inputLine);
+//                writer.println("Servidor recibió: " + inputLine);
             }
 
         } catch (IOException e) {
@@ -167,6 +184,35 @@ public class Server {
 
     public ArrayList<Subscriber> getSubsList() {
         return subscribers;
+    }
+
+    private String getPlayerListJSON() {
+        try {
+            JSONObject json = new JSONObject();
+
+            JSONArray playersArray = new JSONArray();
+
+            subscribers.forEach(subscriber -> {
+                if (subscriber.getType() == SubscriberType.PLAYER) {
+                    JSONObject playerJson = new JSONObject();
+                    playerJson.put("name", subscriber.getName());
+                    playersArray.put(playerJson);
+                    System.out.println(subscribers);
+                }
+            });
+
+            json.put("players", playersArray);
+
+
+            json.put("msg_type", "player_list");
+            String jsonString = json.toString();
+            return jsonString;
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
 

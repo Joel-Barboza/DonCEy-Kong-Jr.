@@ -13,10 +13,10 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#define close closesocket
-#define read(s, b, l) recv(s, b, l, 0)
-#define write(s, b, l) send(s, b, l, 0)
+// #pragma comment(lib, "ws2_32.lib")
+// #define close closesocket
+// #define read(s, b, l) recv(s, b, l, 0)
+// #define write(s, b, l) send(s, b, l, 0)
 #else
 #include <unistd.h>
 #include <sys/socket.h>
@@ -27,6 +27,9 @@
 
 extern int connected;
 SDL_Renderer *renderer;
+
+
+
 
 
 // -----------------------------
@@ -554,36 +557,143 @@ void draw_game(const _Bool *keyboard_state) {
 
     SDL_RenderPresent(renderer);
 
+    // intenté enviar el mensaje cada frame, pero el juego se relentizó demasiado
+    // send_movement_info(&monkey.rect.x, &monkey.rect.y, &monkey.rect.w, &monkey.rect.h);
+    // guarda solo el ultimo movimiento hecho
+    if (mv_mutex) {
+        SDL_LockMutex(mv_mutex);
+        latest_movement.x = monkey.rect.x;
+        latest_movement.y = monkey.rect.y;
+        latest_movement.w = monkey.rect.w;
+        latest_movement.h = monkey.rect.h;
+        mv_updated = 1;
+        SDL_UnlockMutex(mv_mutex);
+    }
     SDL_Delay(16); // ~60 FPS
 }
 
-void draw_connect(Button *btn, InputField *input_field) {
+void draw_spectator_mode() {
+    // // Fondo negro
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    // Dibujar elementos del nivel (estáticos)
+    draw_platforms();
+    draw_vines();
+    draw_fruits();
+
+    // El mono se dibuja desde los datos recibidos por red
+    draw_monkey();
+
+    // Indicador de modo espectador
+    TTF_Font *font = TTF_OpenFont("resources/arial.ttf", 20);
+    char *text = "MODO ESPECTADOR";
+    if (font) {
+        SDL_Surface *text_surface = TTF_RenderText_Blended(font, text, SDL_strlen(text), (SDL_Color){255, 255, 0, 255});
+        if (text_surface) {
+            SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+            SDL_FRect text_rect = {10, 570, 200, 30};
+            SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
+            SDL_DestroyTexture(text_texture);
+            SDL_DestroySurface(text_surface);
+        }
+    }
+
+    SDL_RenderPresent(renderer);
+    SDL_Delay(16); // ~60 FPS
+}
+
+void draw_connect(Button *btn_start_game, InputField *input_field) {
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
     draw_input_field(input_field);
-    draw_button(btn);
+    draw_button(btn_start_game);
     SDL_RenderPresent(renderer);
 }
 
-void handle_connection(InputField input_field) {
+// void handle_connection(InputField input_field) {
+//     if (!connected) {
+//         SDL_Log("Intentando conectar...");
+//         SDL_Log("Nombre Jugador: %s", input_field.text);
+//
+//         char *player_name = SDL_strdup(input_field.text);
+//         if (!player_name) {
+//             SDL_Log("Error copying player name");
+//             return;
+//         }
+//
+//         SDL_Thread *thread = SDL_CreateThread(start_socket, "SocketThread", (void*)player_name);
+//         if (!thread) {
+//             SDL_Log("Error creating socket thread");
+//             SDL_free(player_name);
+//         }
+//     } else {
+//         SDL_Log("Reintentando conexión...");
+//         retry_connection("127.0.0.1");
+//     }
+// }
+
+
+
+
+void draw_mode_selection(Button *btn_play, Button *btn_spectate) {
+    draw_button(btn_play);
+    draw_button(btn_spectate);
+    SDL_RenderPresent(renderer);
+};
+
+void draw_spectator_list() {
+    request_player_info();
+
+};
+
+
+void handle_spectator_connection() {
+
     if (!connected) {
-        SDL_Log("Intentando conectar...");
-        SDL_Log("Nombre Jugador: %s", input_field.text);
 
-        char *player_name = SDL_strdup(input_field.text);
-        if (!player_name) {
-            SDL_Log("Error copying player name");
-            return;
-        }
+        ThreadArgs* args = malloc(sizeof *args);
+        if (!args) return;
 
-        SDL_Thread *thread = SDL_CreateThread(socket_thread, "SocketThread", (void*)player_name);
+        args->game_mode = SDL_strdup("SPECTATOR");
+        args->name = NULL;
+
+
+        SDL_Thread *thread = SDL_CreateThread(start_socket, "SocketThread", (void*)args);
         if (!thread) {
             SDL_Log("Error creating socket thread");
-            SDL_free(player_name);
+            SDL_free(args);
+        }
+    } else {
+        SDL_Log("Reintentando conexión...");
+        retry_connection("127.0.0.1");
+    }
+};
+
+
+void handle_player_connection(InputField input_field) {
+    if (!connected) {
+
+        ThreadArgs* args = malloc(sizeof *args);
+        if (!args) return;
+
+        args->game_mode = SDL_strdup("PLAYER");
+        args->name = SDL_strdup(input_field.text);
+
+
+        SDL_Thread *thread = SDL_CreateThread(start_socket, "SocketThread", (void*)args);
+        if (!thread) {
+            SDL_Log("Error creating socket thread");
+            SDL_free(args);
         }
     } else {
         SDL_Log("Reintentando conexión...");
         retry_connection("127.0.0.1");
     }
 }
+
 
 // ---------------------------
 // Ventana y loop principal
@@ -592,6 +702,14 @@ int window() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_Log("SDL init failed: %s", SDL_GetError());
         return -1;
+    }
+
+    if (!mv_mutex) {
+        mv_mutex = SDL_CreateMutex();
+        if (!mv_mutex) {
+            SDL_Log("Failed to create movement mutex: %s", SDL_GetError());
+            // handle error
+        }
     }
 
     if (TTF_Init() < 0) {
@@ -625,7 +743,9 @@ int window() {
     }
 
     InputField input_field = create_input_field(300, 200, 200, 36, font ? font : NULL);
-    Button btn = create_button(300, 250, 200, 36, "Conectar", font ? font : NULL);
+    Button btn_play = create_button(190, 250, 200, 36, "Jugar", font ? font : NULL);
+    Button btn_spectate = create_button(410, 250, 200, 36, "Espectar", font ? font : NULL);
+    Button btn_start_game = create_button(300, 250, 200, 36, "Iniciar ", font ? font : NULL);
     // Fruit fruit = create_banana(300, 250);
 
     initialize_level_elements();
@@ -640,7 +760,7 @@ int window() {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = 0;
 
-            // Handle input field events - FIXED FOR SDL3
+            // Handle input field events
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 // SDL3 uses different field names
                 float mouse_x, mouse_y;
@@ -660,24 +780,39 @@ int window() {
                     handle_input_field_backspace(&input_field);
                 } else if (e.key.key == SDLK_RETURN && input_field.is_active) {
                     input_field.is_active = 0;
-                    handle_connection(input_field);
+                    handle_player_connection(input_field);
                 }
             }
 
             // Handle button events
-            if (button_handle_event(&btn, &e)) {
-                handle_connection(input_field);
+            if (button_handle_event(&btn_play, &e)) {
+                current_mode = PLAYER;
+                // handle_connection(input_field);
             }
+            if (button_handle_event(&btn_spectate, &e)) {
+                current_mode = SPECTATOR;
+                handle_spectator_connection();
+            }
+
+            if (button_handle_event(&btn_start_game, &e)) {
+                handle_player_connection(input_field);
+            }
+
+
+
         }
 
 
-        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
-        SDL_RenderClear(renderer);
+        if (current_mode == MENU) {
+            draw_mode_selection(&btn_play, &btn_spectate);
+        }
+        else if (current_mode == PLAYER) {
+            if (!connected) draw_connect(&btn_start_game, &input_field);
+            else draw_game(keyboard_state);
+        }
+        else if (current_mode == SPECTATOR) {
 
-        if (!connected) {
-            draw_connect(&btn, &input_field);
-        } else {
-            draw_game(keyboard_state);
+            // draw_spectator_mode();
         }
 
         // SDL_RenderPresent(renderer);
@@ -685,7 +820,9 @@ int window() {
 
     SDL_StopTextInput(window);
     destroy_input_field(&input_field);
-    destroy_button(&btn);
+    destroy_button(&btn_play);
+    destroy_button(&btn_spectate);
+    destroy_button(&btn_start_game);
     destroy_fruits();
     if (font) TTF_CloseFont(font);
     TTF_Quit();

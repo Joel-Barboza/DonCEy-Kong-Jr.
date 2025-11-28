@@ -1,3 +1,5 @@
+#include "socket_thread.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,9 +13,13 @@
 #include "constants.h"
 
 
-extern SDL_Renderer* renderer;
+extern SDL_Renderer *renderer;
 extern Fruit fruits[MAX_FRUITS];
 extern int fruit_count;
+Movement latest_movement = {0, 0, 0, 0};
+int mv_updated = 0;
+SDL_Mutex *mv_mutex = NULL;
+GameMode current_mode = MENU;
 
 static SOCKET global_socket = INVALID_SOCKET;
 int connected = 0;
@@ -121,8 +127,12 @@ int send_subscriber_info(const char *type, const char *name) {
     cJSON *json = cJSON_CreateObject();
     if (!json) return -1;
 
+    cJSON_AddStringToObject(json, "msg_type", "subs_type");
     cJSON_AddStringToObject(json, "type", type);
-    cJSON_AddStringToObject(json, "name", name);
+    if (strcmp(type, "PLAYER") == 0) {
+        cJSON_AddStringToObject(json, "name", name);
+    }
+
 
     char *json_str = cJSON_PrintUnformatted(json);
     if (!json_str) {
@@ -133,6 +143,57 @@ int send_subscriber_info(const char *type, const char *name) {
     int result = send_message(json_str);
     free(json_str);
     cJSON_Delete(json);
+    return result;
+}
+
+int request_player_info() {
+    cJSON *json = cJSON_CreateObject();
+    if (!json) return -1;
+
+    cJSON_AddStringToObject(json, "msg_type", "request_players");
+
+    char *json_str = cJSON_PrintUnformatted(json);
+    if (!json_str) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    int result = send_message(json_str);
+    free(json_str);
+    cJSON_Delete(json);
+    return result;
+}
+
+int send_movement_info(const float *x, const float *y, const float *w, const float *h) {
+    cJSON *json = cJSON_CreateObject();
+    if (!json) return -1;
+
+    cJSON_AddStringToObject(json, "msg_type", "movement");
+
+    cJSON *rect = cJSON_CreateObject();
+    if (!rect) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    cJSON_AddNumberToObject(rect, "x", *x);
+    cJSON_AddNumberToObject(rect, "y", *y);
+    cJSON_AddNumberToObject(rect, "width", *w);
+    cJSON_AddNumberToObject(rect, "height", *h);
+
+    cJSON_AddItemToObject(json, "dkj_rect", rect);
+
+    char *json_str = cJSON_PrintUnformatted(json);
+    if (!json_str) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    int result = send_message(json_str);
+
+    free(json_str);
+    cJSON_Delete(json);
+
     return result;
 }
 
@@ -148,19 +209,20 @@ int connect_to_server(SOCKET *sock, const char *ip, int port) {
         return -1;
     }
 
-    if (connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (connect(*sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         printf("Conexion fallida a %s:%d\n", ip, port);
         return -1;
     }
 
     printf("Conectado al servidor %s:%d!\n", ip, port);
     connected = 1;
+
     return 0;
 }
 
 
 // returns true if parsing was successful
-bool fruit_JSON(char* json, int* type, int *x, int *y, int *w, int *h) {
+bool fruit_JSON(char *json, int *type, int *x, int *y, int *w, int *h) {
     cJSON *parsed_json = cJSON_Parse(json);
     if (!parsed_json) return false;
 
@@ -170,6 +232,8 @@ bool fruit_JSON(char* json, int* type, int *x, int *y, int *w, int *h) {
         return false;
     }
 
+
+    cJSON *j_msg_type = cJSON_AddStringToObject(parsed_json, "msg_type", "fruit");
     cJSON *jtype = cJSON_GetObjectItemCaseSensitive(rect, "type");
     cJSON *jx = cJSON_GetObjectItemCaseSensitive(rect, "x");
     cJSON *jy = cJSON_GetObjectItemCaseSensitive(rect, "y");
@@ -178,10 +242,9 @@ bool fruit_JSON(char* json, int* type, int *x, int *y, int *w, int *h) {
 
     if (!cJSON_IsNumber(jx) || !cJSON_IsNumber(jy) ||
         !cJSON_IsNumber(jw) || !cJSON_IsNumber(jh)) {
-
         cJSON_Delete(parsed_json);
         return false;
-        }
+    }
 
     *type = jtype->valueint;
     *x = jx->valueint;
@@ -201,18 +264,21 @@ void add_fruit(int type, int x, int y) {
     fruit_count++;
 }
 
+// {"players":[{"name":"asdf"}],"msg_type":"player_list"}
 
+int start_socket(void *data) {
+    ThreadArgs *args = (ThreadArgs *) data;
 
-
-int socket_thread(void *data) {
-    char *player_name = (char *)data;
-    const char *server_ip = "127.0.0.1"; // Default IP, or get from another input field
+    char *game_mode = args->game_mode;
+    char *name = args->name;
+    const char *server_ip = "127.0.0.1"; // Default IP
 
 #ifdef _WIN32
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("Error inicializando Winsock\n");
-        SDL_free(player_name);
+        SDL_free(game_mode);
+        SDL_free(name);
         return -1;
     }
 #endif
@@ -224,7 +290,8 @@ int socket_thread(void *data) {
     global_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (global_socket == INVALID_SOCKET) {
         printf("Error creando socket\n");
-        SDL_free(player_name);
+        SDL_free(game_mode);
+        SDL_free(name);
 #ifdef _WIN32
         WSACleanup();
 #endif
@@ -234,16 +301,20 @@ int socket_thread(void *data) {
     if (connect_to_server(&global_socket, server_ip, PORT) < 0) {
         closesocket(global_socket);
         global_socket = INVALID_SOCKET;
-        SDL_free(player_name);
+        SDL_free(game_mode);
+        SDL_free(name);
 #ifdef _WIN32
         WSACleanup();
 #endif
         return -1;
     }
 
+    if (current_mode == SPECTATOR) {
+        request_player_info();
+    }
     // Send player name as JSON
-    if (player_name && strlen(player_name) > 0) {
-        send_subscriber_info("PLAYER", player_name);
+    if (game_mode && strlen(game_mode) > 0) {
+        send_subscriber_info(game_mode, name);
     }
 
     char buffer[BUFFER_SIZE] = {0};
@@ -254,47 +325,90 @@ int socket_thread(void *data) {
         printf("Servidor: %s\n", buffer);
     }
 
+    uint32_t last_send_time = SDL_GetTicks();
+
     // Main communication loop for the game
     while (connected) {
-        // Receive game updates from server
         memset(buffer, 0, BUFFER_SIZE);
-        valread = receive_message(buffer, BUFFER_SIZE, 0); // Non-blocking
+        valread = receive_message(buffer, BUFFER_SIZE, 0);
+
+        if (valread < 0)
+            break;
+
         if (valread > 0) {
-            printf("Servidor: %s\n", buffer);
-
-            int type, x, y, w, h;
-
-            // const char* json = "{\"rectangle\":{\"x\":80,\"width\":6,\"y\":78,\"height\":300}}";
-
-            if (fruit_JSON(buffer, &type, &x, &y, &w, &h)) {
-                printf("Rectangle: x=%d y=%d w=%d h=%d\n", x, y, w, h);
-
-                // Fruit fruit = create_fruit(type, x, y);
-                // draw_fruit(&fruit);
-                add_fruit(type, x, y);
-                // SDL_RenderPresent(renderer);
-            } else {
-                printf("Invalid JSON\n");
+            cJSON *parsed_json = cJSON_Parse(buffer);
+            if (!parsed_json) {
+                SDL_Log("Invalid JSON");
+                continue;
             }
 
-            // Handle game state updates here
-        } else if (valread < 0) {
-            break; // Connection error
+            cJSON *msg_type = cJSON_GetObjectItemCaseSensitive(parsed_json, "msg_type");
+            if (!msg_type || !cJSON_IsString(msg_type)) {
+                cJSON_Delete(parsed_json);
+                continue;
+            }
+
+            // ===== PLAYER LIST =====
+            if (strcmp(msg_type->valuestring, "player_list") == 0) {
+                cJSON *players = cJSON_GetObjectItemCaseSensitive(parsed_json, "players");
+                if (players && cJSON_IsArray(players)) {
+                    printf("Players online: %d\n", cJSON_GetArraySize(players));
+
+                    for (int i = 0; i < cJSON_GetArraySize(players); i++) {
+                        cJSON *player = cJSON_GetArrayItem(players, i);
+                        cJSON *name = cJSON_GetObjectItemCaseSensitive(player, "name");
+                        if (name && cJSON_IsString(name)) {
+                            printf(" - %s\n", name->valuestring);
+                        }
+                    }
+                }
+            }
+
+            // ===== FRUIT =====
+            else if (strcmp(msg_type->valuestring, "fruit") == 0) {
+                cJSON *rect = cJSON_GetObjectItem(parsed_json, "rectangle");
+                if (rect) {
+                    int x = cJSON_GetObjectItem(rect, "x")->valueint;
+                    int y = cJSON_GetObjectItem(rect, "y")->valueint;
+                    int w = cJSON_GetObjectItem(rect, "width")->valueint;
+                    int h = cJSON_GetObjectItem(rect, "height")->valueint;
+
+                    add_fruit(msg_type->valueint, x, y);
+                }
+            }
+
+            cJSON_Delete(parsed_json);
         }
 
-        // Small delay to prevent busy waiting
-        SDL_Delay(10);
+        // SEND MOVEMENT (every 50 ms)
+        uint32_t now = SDL_GetTicks();
+        if (current_mode == PLAYER && now - last_send_time >= 50) {
+            last_send_time = now;
+
+            SDL_LockMutex(mv_mutex);
+            if (mv_updated) {
+                send_movement_info(&latest_movement.x,
+                                   &latest_movement.y,
+                                   &latest_movement.w,
+                                   &latest_movement.h);
+
+                mv_updated = 0;
+            }
+            SDL_UnlockMutex(mv_mutex);
+        }
+
+        SDL_Delay(30);
     }
+
 
     if (global_socket != INVALID_SOCKET) {
         closesocket(global_socket);
         global_socket = INVALID_SOCKET;
     }
 
-    // Free the player name memory
-    if (player_name) {
-        SDL_free(player_name);
-    }
+    SDL_free(args->game_mode);
+    SDL_free(args->name);
+    free(args);
 
 #ifdef _WIN32
     WSACleanup();
@@ -304,8 +418,7 @@ int socket_thread(void *data) {
 }
 
 
-
-// Updated retry_connection to use a specific IP
+// retry_connection with a specific IP
 int retry_connection(const char *ip) {
     if (ip == NULL || strlen(ip) == 0) {
         ip = "127.0.0.1";

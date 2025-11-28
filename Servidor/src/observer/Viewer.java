@@ -9,13 +9,11 @@ import java.net.Socket;
 
 public class Viewer implements Subscriber {
     private final SubscriberType type = SubscriberType.VIEWER;
-    private final String name;
     private final Socket socket;
     private final BufferedReader reader;
     private final PrintWriter writer;
 
-    public Viewer(String name, Socket socket, BufferedReader reader,PrintWriter writer) throws IOException {
-        this.name = name;
+    public Viewer(Socket socket, BufferedReader reader,PrintWriter writer) throws IOException {
         this.socket = socket;
 
 //        this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -25,7 +23,7 @@ public class Viewer implements Subscriber {
     }
 
     @Override
-    public String getName() { return name; }
+    public String getName() { return null; }
 
     @Override
     public Socket getSocket() { return socket; }
