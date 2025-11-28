@@ -1,3 +1,15 @@
 [submodule "Cliente/vendored/SDL"]
 	path = Cliente/vendored/SDL
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "Cliente/vendored/SDL_ttf"]
+	path = Cliente/vendored/SDL_ttf
+	url = https://github.com/libsdl-org/SDL_ttf.git
+[submodule "vendored/cJSON"]
+	path = vendored/cJSON
+	url = https://github.com/DaveGamble/cJSON
+[submodule "Cliente/vendored/cJSON"]
+	path = Cliente/vendored/cJSON
+	url = https://github.com/DaveGamble/cJSON
+[submodule "Cliente/vendored/SDL_image"]
+	path = Cliente/vendored/SDL_image
+	url = https://github.com/libsdl-org/SDL_image.git

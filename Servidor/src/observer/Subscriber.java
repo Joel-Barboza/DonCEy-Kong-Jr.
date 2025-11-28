@@ -1,8 +1,16 @@
 package observer;
 
-import java.util.ArrayList;
+import java.io.BufferedReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+
 
 public interface Subscriber {
-
-    public void update(ArrayList context);
+    String getName();
+    Socket getSocket();
+    PrintWriter getWriter();   // For sending messages
+    BufferedReader getReader(); // Optional, if needed
+    SubscriberType getType();
 }
+
+

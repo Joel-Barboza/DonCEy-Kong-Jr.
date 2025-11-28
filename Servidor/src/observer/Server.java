@@ -3,12 +3,16 @@ package observer;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import org.json.JSONObject;
 
 public class Server {
     // singleton instance
     private static Server instance = null;
     // Observer subscribers
-    private ArrayList<Subscriber> subscribers = new ArrayList<Subscriber>();
+    private final ArrayList<Subscriber> subscribers = new ArrayList<Subscriber>();
 
     // server parameters
     private static final int PORT = 8080;
@@ -19,7 +23,7 @@ public class Server {
     //-----------------------------------------------------
     //                 Singleton server
     //-----------------------------------------------------
-    private Server() {
+    public Server() {
         System.out.println("Iniciando server");
         isRunning = false;
     }
@@ -44,7 +48,7 @@ public class Server {
     }
 
     public void notifySubscribers() {
-        subscribers.forEach(subscriber -> subscriber.update(new ArrayList<>()));
+//        subscribers.forEach(subscriber -> subscriber.update(String.valueOf(new ArrayList<>())));
     }
 
 
@@ -94,21 +98,13 @@ public class Server {
 
     private void runServerLoop() {
         while (isRunning) {
-            try (Socket clientSocket = serverSocket.accept();
-                 BufferedReader in = new BufferedReader(
-                         new InputStreamReader(clientSocket.getInputStream()));
-                 PrintWriter out = new PrintWriter(
-                         clientSocket.getOutputStream(), true)) {
-
+            try {
+                Socket clientSocket = serverSocket.accept();
                 System.out.println("Cliente conectado: " +
                         clientSocket.getInetAddress().getHostAddress());
 
-                // Enviar mensaje de bienvenida
-                out.println("Bienvenido al servidor! Escribe 'quit' para salir");
-
-                handleClientCommunication(in, out);
-
-                System.out.println("Cliente desconectado");
+                // Create new thread for this client
+                new Thread(() -> handleClient(clientSocket)).start();
 
             } catch (IOException e) {
                 if (isRunning) {
@@ -118,23 +114,59 @@ public class Server {
         }
     }
 
-    private void handleClientCommunication(BufferedReader in, PrintWriter out) {
-        try {
+
+//    private void handleClientCommunication(BufferedReader in, PrintWriter out) {
+//        try {
+//            String inputLine;
+//            while ((inputLine = in.readLine()) != null) {
+//                System.out.println("Cliente dice: " + inputLine);
+//
+//                if ("quit".equalsIgnoreCase(inputLine)) {
+//                    out.println("Adios!");
+//                    break;
+//                }
+//
+//                // Responder al cliente
+//                out.println("Servidor recibio: " + inputLine);
+//            }
+//        } catch (IOException e) {
+//            System.out.println("Error en comunicación con cliente: " + e.getMessage());
+//        }
+//    }
+
+    private void handleClient(Socket clientSocket) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+             PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {
+
+            writer.println("Bienvenido al servidor! Escribe 'quit' para salir");
+
             String inputLine;
-            while ((inputLine = in.readLine()) != null) {
+            while ((inputLine = reader.readLine()) != null) {
                 System.out.println("Cliente dice: " + inputLine);
+                JSONObject obj = new JSONObject(inputLine);
+
+                if (obj.has("name") && Objects.equals(obj.getString("type"), "PLAYER")) {
+                    String name = obj.getString("name");
+                    System.out.println("Name = " + name);
+                    Player player = new Player(name, clientSocket, reader, writer);
+                    subscribers.add(player);
+                }
 
                 if ("quit".equalsIgnoreCase(inputLine)) {
-                    out.println("Adios!");
+                    writer.println("Adios!");
                     break;
                 }
 
-                // Responder al cliente
-                out.println("Servidor recibio: " + inputLine);
+                writer.println("Servidor recibió: " + inputLine);
             }
+
         } catch (IOException e) {
             System.out.println("Error en comunicación con cliente: " + e.getMessage());
         }
+    }
+
+    public ArrayList<Subscriber> getSubsList() {
+        return subscribers;
     }
 
 

@@ -7,22 +7,22 @@
 
 
 #include <SDL3/SDL.h>
+#include "SDL3_ttf/SDL_ttf.h"
 
 typedef struct {
-    SDL_Rect rect;             // position and size
-    SDL_Color color;           // normal color
-    SDL_Color hoverColor;      // when mouse is over
-    const char *text;          // optional label
-    int hovered;               // internal flag
+    SDL_FRect rect;
+    SDL_Color color;
+    SDL_Color hoverColor;
+    const char *text;
+    int hovered;
+    TTF_Font *font;          // font for text
+    SDL_Texture *textTexture;
+    SDL_FRect textRect;
 } Button;
 
-// Initialize a button
-Button create_button(int x, int y, int w, int h, const char *text);
-
-// Draw button
-void draw_button(SDL_Renderer *renderer, Button *btn);
-
-// Check if button is clicked
+Button create_button(int x, int y, int w, int h, const char *text, TTF_Font *font);
+void draw_button(Button *btn);
 int button_handle_event(Button *btn, SDL_Event *e);
+void destroy_button(Button *btn);
 
 #endif //CLIENTETCP_BUTTON_H

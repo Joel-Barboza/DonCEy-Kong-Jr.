@@ -108,7 +108,8 @@ cmake-build-*/
 *.iws
 
 # IntelliJ
-out/
+Servidor/out/
+!Servidor/out/artifacts
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/
