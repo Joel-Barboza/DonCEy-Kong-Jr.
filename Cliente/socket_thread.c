@@ -11,15 +11,21 @@
 #include "cjson/cJSON.h"
 #include "widgets/fruit.h"
 #include "constants.h"
+#include "widgets/button.h"
+#include "widgets/crocodile.h"
 
 
 extern SDL_Renderer *renderer;
 extern Fruit fruits[MAX_FRUITS];
 extern int fruit_count;
+extern Crocodile crocodiles[MAX_CROCODILES];
+extern int crocodile_count;
 Movement latest_movement = {0, 0, 0, 0};
 int mv_updated = 0;
 SDL_Mutex *mv_mutex = NULL;
 GameMode current_mode = MENU;
+
+
 
 static SOCKET global_socket = INVALID_SOCKET;
 int connected = 0;
@@ -222,7 +228,7 @@ int connect_to_server(SOCKET *sock, const char *ip, int port) {
 
 
 // returns true if parsing was successful
-bool fruit_JSON(char *json, int *type, int *x, int *y, int *w, int *h) {
+bool parse_widged_placement_JSON(char *json,int *type, int *x, int *y, int *w, int *h, int *vine) {
     cJSON *parsed_json = cJSON_Parse(json);
     if (!parsed_json) return false;
 
@@ -233,20 +239,24 @@ bool fruit_JSON(char *json, int *type, int *x, int *y, int *w, int *h) {
     }
 
 
-    cJSON *j_msg_type = cJSON_AddStringToObject(parsed_json, "msg_type", "fruit");
-    cJSON *jtype = cJSON_GetObjectItemCaseSensitive(rect, "type");
+    // cJSON *j_msg_type = cJSON_AddStringToObject(parsed_json, "msg_type", wid_type);
+    //
+
+    cJSON *jtype = cJSON_GetObjectItemCaseSensitive(parsed_json, "type");
+    cJSON *jvine = cJSON_GetObjectItemCaseSensitive(parsed_json, "vine");
     cJSON *jx = cJSON_GetObjectItemCaseSensitive(rect, "x");
     cJSON *jy = cJSON_GetObjectItemCaseSensitive(rect, "y");
     cJSON *jw = cJSON_GetObjectItemCaseSensitive(rect, "width");
     cJSON *jh = cJSON_GetObjectItemCaseSensitive(rect, "height");
 
     if (!cJSON_IsNumber(jx) || !cJSON_IsNumber(jy) ||
-        !cJSON_IsNumber(jw) || !cJSON_IsNumber(jh)) {
+        !cJSON_IsNumber(jw) || !cJSON_IsNumber(jh) || !cJSON_IsNumber(jvine)) {
         cJSON_Delete(parsed_json);
         return false;
     }
 
     *type = jtype->valueint;
+    *vine = jvine->valueint;
     *x = jx->valueint;
     *y = jy->valueint;
     *w = jw->valueint;
@@ -257,6 +267,7 @@ bool fruit_JSON(char *json, int *type, int *x, int *y, int *w, int *h) {
 }
 
 
+
 void add_fruit(int type, int x, int y) {
     if (fruit_count >= MAX_FRUITS) return;
 
@@ -264,7 +275,15 @@ void add_fruit(int type, int x, int y) {
     fruit_count++;
 }
 
+void add_crocodile(int type, int x, int y, int vine) {
+    if (crocodile_count >= MAX_CROCODILES) return;
+
+    crocodiles[crocodile_count] = create_crocodile(type, x, y, vine);
+    crocodile_count++;
+}
+
 // {"players":[{"name":"asdf"}],"msg_type":"player_list"}
+
 
 int start_socket(void *data) {
     ThreadArgs *args = (ThreadArgs *) data;
@@ -348,34 +367,52 @@ int start_socket(void *data) {
                 continue;
             }
 
+            int type, x, y, w, h, vine;
+
+
+            // ===== FRUITS =====
+            if (strcmp(msg_type->valuestring, "place_fruit") == 0 && parse_widged_placement_JSON(buffer, &type, &x, &y, &w, &h, &vine)) {
+                // printf("Rectangle: x=%d y=%d w=%d h=%d\n", x, y, w, h);
+
+                add_fruit(type, x, y);
+            } else {
+                printf("Invalid JSON\n");
+            }
+
+            // ===== Crocodiles =====
+            if (strcmp(msg_type->valuestring, "place_crocodile") == 0 && parse_widged_placement_JSON(buffer, &type, &x, &y, &w, &h, &vine)) {
+                // printf("Rectangle: x=%d y=%d w=%d h=%d\n", x, y, w, h);
+
+                add_crocodile(type, x, y, vine);
+            } else {
+                printf("Invalid JSON\n");
+            }
+
             // ===== PLAYER LIST =====
             if (strcmp(msg_type->valuestring, "player_list") == 0) {
                 cJSON *players = cJSON_GetObjectItemCaseSensitive(parsed_json, "players");
                 if (players && cJSON_IsArray(players)) {
                     printf("Players online: %d\n", cJSON_GetArraySize(players));
 
+                    TTF_Font *font = TTF_OpenFont("resources/arial.ttf", 20);
+                    if (!font) {
+                        SDL_Log("Failed to load font. Continuing without text.");
+                    }
+                    for (int i = 0; i < cJSON_GetArraySize(players); i++) {
+                    }
+
                     for (int i = 0; i < cJSON_GetArraySize(players); i++) {
                         cJSON *player = cJSON_GetArrayItem(players, i);
                         cJSON *name = cJSON_GetObjectItemCaseSensitive(player, "name");
                         if (name && cJSON_IsString(name)) {
-                            printf(" - %s\n", name->valuestring);
+                            Button btn = create_button(50 * (i + 1), 50 * (i + 1), 200, 36, name->valuestring, font ? font : NULL);
+                            draw_button(&btn);
+                            // printf(" - %s\n", name->valuestring);
                         }
                     }
                 }
             }
 
-            // ===== FRUIT =====
-            else if (strcmp(msg_type->valuestring, "fruit") == 0) {
-                cJSON *rect = cJSON_GetObjectItem(parsed_json, "rectangle");
-                if (rect) {
-                    int x = cJSON_GetObjectItem(rect, "x")->valueint;
-                    int y = cJSON_GetObjectItem(rect, "y")->valueint;
-                    int w = cJSON_GetObjectItem(rect, "width")->valueint;
-                    int h = cJSON_GetObjectItem(rect, "height")->valueint;
-
-                    add_fruit(msg_type->valueint, x, y);
-                }
-            }
 
             cJSON_Delete(parsed_json);
         }

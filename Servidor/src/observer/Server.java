@@ -118,25 +118,6 @@ public class Server {
     }
 
 
-//    private void handleClientCommunication(BufferedReader in, PrintWriter out) {
-//        try {
-//            String inputLine;
-//            while ((inputLine = in.readLine()) != null) {
-//                System.out.println("Cliente dice: " + inputLine);
-//
-//                if ("quit".equalsIgnoreCase(inputLine)) {
-//                    out.println("Adios!");
-//                    break;
-//                }
-//
-//                // Responder al cliente
-//                out.println("Servidor recibio: " + inputLine);
-//            }
-//        } catch (IOException e) {
-//            System.out.println("Error en comunicación con cliente: " + e.getMessage());
-//        }
-//    }
-
     private void handleClient(Socket clientSocket) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
              PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {

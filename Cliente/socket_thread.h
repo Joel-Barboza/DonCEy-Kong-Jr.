@@ -37,7 +37,7 @@ int send_movement_info(const float *x, const float *y, const float *w, const flo
 int receive_message(char *buffer, size_t buffer_size, int blocking);
 int is_connected();
 int request_player_info();
-bool fruit_JSON(char* json, int* type, int *x, int *y, int *w, int *h);
+bool parse_widged_placement_JSON(char* json, int* type, int *x, int *y, int *w, int *h, int *vine);
 int retry_connection(const char *ip);
 void close_connection();
 

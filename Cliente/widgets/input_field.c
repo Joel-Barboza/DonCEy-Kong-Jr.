@@ -84,7 +84,7 @@ void draw_input_field(InputField *field) {
             float cursor_x = field->rect.x + 5.0f;
             if (field->textTexture) {
                 // Use the texture width to position cursor at end of text
-                int w, h;
+                float w, h;
                 SDL_GetTextureSize(field->textTexture, &w, &h);
                 cursor_x += (float)w;
             }

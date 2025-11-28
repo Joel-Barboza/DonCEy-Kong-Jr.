@@ -9,6 +9,7 @@
 #include "widgets/fruit.h"
 #include "widgets/input_field.h"
 #include "constants.h"
+#include "widgets/crocodile.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -27,10 +28,9 @@
 
 extern int connected;
 SDL_Renderer *renderer;
-
-
-
-
+int lives = 3;
+int game_over = 0;
+TTF_Font *lives_font = NULL;
 
 // -----------------------------
 // Nivel: plataformas y lianas
@@ -43,6 +43,8 @@ SDL_FRect vines[NUM_VINES];
 
 Fruit fruits[MAX_FRUITS];
 int fruit_count = 0;
+Crocodile crocodiles[MAX_CROCODILES];
+int crocodile_count = 0;
 
 // -----------------------------
 // Mono (personaje)
@@ -62,11 +64,43 @@ typedef struct {
 
 Monkey monkey;
 
-// Constantes de física
-const float GRAVITY = 0.5f;
-const float JUMP_FORCE = -10.0f;
-const float MOVE_SPEED = 3.0f;
-const float CLIMB_SPEED = 2.5f; // Nuevo: velocidad de escalada
+// Función para dibujar las vidas en pantalla
+// Función para dibujar las vidas en pantalla (sin TTF)
+void draw_lives() {
+    // Dibujar un rectángulo simple por cada vida
+    for (int i = 0; i < lives; i++) {
+        SDL_FRect life_rect = {10.0f + i * 30.0f, 550.0f, 20.0f, 20.0f};
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Rojo
+        SDL_RenderFillRect(renderer, &life_rect);
+    }
+}
+void lose_life() {
+    if (lives > 0) {
+        lives--;
+
+        // Efecto visual: parpadeo rojo
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 100);
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(100);
+
+        if (lives <= 0) {
+            game_over = 1;
+        }
+    }
+
+    if (!game_over) {
+        // Solo reiniciar posición si el juego no ha terminado
+        monkey.rect.x = 50.0f;
+        monkey.rect.y = 470.0f;
+        monkey.velocityX = 0.0f;
+        monkey.velocityY = 0.0f;
+        monkey.isOnGround = 1;
+        monkey.isOnVine = 0;
+        monkey.currentVine = -1;
+    }
+}
+
 
 void initialize_level_elements() {
     platforms[0] = (SDL_FRect){20.0f, 60.0f, 400.0f, 18.0f};
@@ -124,6 +158,51 @@ int check_vine_collision() {
     return -1; // No está tocando ninguna liana
 }
 
+void update_crocodile(Crocodile* c) {
+    SDL_FRect v = vines[c->vine];
+
+    // Move vertically
+    c->rect.y += c->velocity;
+
+    // TYPE 1: Bounce inside the vine
+    if (c->type == 1) {
+
+        // Bounce at the top
+        if (c->rect.y < v.y) {
+            c->rect.y = v.y;
+            c->velocity *= -1;
+        }
+
+        // Bounce at the bottom
+        if (c->rect.y + c->rect.h > v.y + v.h) {
+            c->rect.y = v.y + v.h - c->rect.h;
+            c->velocity *= -1;
+        }
+
+        return;
+    }
+
+    // TYPE 0: Fall when reaching bottom
+    if (c->type == 0) {
+
+        // Reached the end of the vine → start falling
+        if (c->rect.y > v.y + v.h) {
+            c->velocity = 5.0f;  // falling speed (adjust as needed)
+        }
+
+        // If they exit the window, mark them for deletion
+        if (c->rect.y > 600 ||    // bottom of screen
+            c->rect.y + c->rect.h < 0 || // above screen
+            c->rect.x + c->rect.w < 0 || // left
+            c->rect.x > 800) {           // right
+
+            c->active = 0;   // ← requires an `active` flag in struct
+            }
+    }
+}
+
+
+
 // Sistema de colisiones mejorado con soporte para lianas
 void update_monkey_physics() {
     // Si está en una liana, manejar movimiento especial
@@ -161,6 +240,17 @@ void update_monkey_physics() {
             }
         }
 
+        for (int i = 0; i < crocodile_count; i++) {
+            if (monkey.rect.x < crocodiles[i].rect.x + crocodiles[i].rect.w &&
+                monkey.rect.x + monkey.rect.w > crocodiles[i].rect.x &&
+                monkey.rect.y < crocodiles[i].rect.y + crocodiles[i].rect.h &&
+                monkey.rect.y + monkey.rect.h > crocodiles[i].rect.y) {
+                lose_life();
+                return;
+
+                }
+        }
+
         return; // Saltar el resto de la física normal cuando está en liana
     }
     if (monkey.rect.x <= 140.0f && monkey.rect.y <= 30.0f) {
@@ -174,14 +264,10 @@ void update_monkey_physics() {
         monkey.currentVine = -1;
     }
     if (monkey.rect.y >= 500.0f) {
-        // Regresar a la posición inicial
-        monkey.rect.x = 50.0f;
-        monkey.rect.y = 470.0f;
-        monkey.velocityX = 0.0f;
-        monkey.velocityY = 0.0f;
-        monkey.isOnGround = 1;
-        monkey.isOnVine = 0;
-        monkey.currentVine = -1;
+        // El mono cayó - perder una vida
+        lose_life();
+
+        return;
     }
     // Física normal (cuando no está en liana)
 
@@ -229,6 +315,17 @@ void update_monkey_physics() {
                 monkey.velocityY = 0;
             }
         }
+    }
+
+    for (int i = 0; i < crocodile_count; i++) {
+        if (monkey.rect.x < crocodiles[i].rect.x + crocodiles[i].rect.w &&
+            monkey.rect.x + monkey.rect.w > crocodiles[i].rect.x &&
+            monkey.rect.y < crocodiles[i].rect.y + crocodiles[i].rect.h &&
+            monkey.rect.y + monkey.rect.h > crocodiles[i].rect.y) {
+            lose_life();
+            return;
+
+            }
     }
 
     // Limites de pantalla
@@ -557,12 +654,32 @@ void destroy_fruits() {
     }
 };
 
+
+void draw_crocodiles() {
+    for (int i = 0; i < crocodile_count; ++i) {
+        Crocodile crocodile = crocodiles[i];
+        draw_crocodile(&crocodile);
+    }
+};
+
+void destroy_crocodiles() {
+    for (int i = 0; i < crocodile_count; ++i) {
+        Crocodile crocodile = crocodiles[i];
+        destroy_crocodile(&crocodile);
+    }
+};
+
 void draw_game(const _Bool *keyboard_state) {
     // Manejar entrada del teclado
     handle_input(keyboard_state);
 
     // Actualizar física del mono
     update_monkey_physics();
+
+    for (int i = 0; i < crocodile_count; i++) {
+        update_crocodile(&crocodiles[i]);
+    }
+
 
     // Fondo negro
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -578,6 +695,8 @@ void draw_game(const _Bool *keyboard_state) {
     // Dibujar botón
     // draw_button(renderer, &btn);
     draw_fruits();
+    draw_crocodiles();
+    draw_lives();
 
     SDL_RenderPresent(renderer);
 
@@ -605,6 +724,7 @@ void draw_spectator_mode() {
     draw_platforms();
     draw_vines();
     draw_fruits();
+    draw_crocodiles();
 
     // El mono se dibuja desde los datos recibidos por red
     draw_monkey();
@@ -628,7 +748,6 @@ void draw_spectator_mode() {
 }
 
 void draw_connect(Button *btn_start_game, InputField *input_field) {
-
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
@@ -660,25 +779,17 @@ void draw_connect(Button *btn_start_game, InputField *input_field) {
 // }
 
 
-
-
 void draw_mode_selection(Button *btn_play, Button *btn_spectate) {
     draw_button(btn_play);
     draw_button(btn_spectate);
     SDL_RenderPresent(renderer);
 };
 
-void draw_spectator_list() {
-    request_player_info();
-
-};
 
 
 void handle_spectator_connection() {
-
     if (!connected) {
-
-        ThreadArgs* args = malloc(sizeof *args);
+        ThreadArgs *args = malloc(sizeof *args);
         if (!args) return;
 
         args->game_mode = SDL_strdup("SPECTATOR");
@@ -690,6 +801,7 @@ void handle_spectator_connection() {
             SDL_Log("Error creating socket thread");
             SDL_free(args);
         }
+        request_player_info();
     } else {
         SDL_Log("Reintentando conexión...");
         retry_connection("127.0.0.1");
@@ -699,8 +811,7 @@ void handle_spectator_connection() {
 
 void handle_player_connection(InputField input_field) {
     if (!connected) {
-
-        ThreadArgs* args = malloc(sizeof *args);
+        ThreadArgs *args = malloc(sizeof *args);
         if (!args) return;
 
         args->game_mode = SDL_strdup("PLAYER");
@@ -719,6 +830,19 @@ void handle_player_connection(InputField input_field) {
 }
 
 
+void draw_select_to_spectate() {
+
+
+
+    // request_player_info();
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_RenderPresent(renderer);
+
+
+};
+
 // ---------------------------
 // Ventana y loop principal
 // ---------------------------
@@ -726,14 +850,6 @@ int window() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_Log("SDL init failed: %s", SDL_GetError());
         return -1;
-    }
-
-    if (!mv_mutex) {
-        mv_mutex = SDL_CreateMutex();
-        if (!mv_mutex) {
-            SDL_Log("Failed to create movement mutex: %s", SDL_GetError());
-            // handle error
-        }
     }
 
     if (TTF_Init() < 0) {
@@ -771,6 +887,10 @@ int window() {
     Button btn_spectate = create_button(410, 250, 200, 36, "Espectar", font ? font : NULL);
     Button btn_start_game = create_button(300, 250, 200, 36, "Iniciar ", font ? font : NULL);
     // Fruit fruit = create_banana(300, 250);
+
+    // Crocodile crocodile = create_crocodile(0, 410, 250);
+    // draw_crocodile(&crocodile);
+
 
     initialize_level_elements();
     initialize_monkey();
@@ -810,32 +930,30 @@ int window() {
 
             // Handle button events
             if (button_handle_event(&btn_play, &e)) {
+                connected = 0;
                 current_mode = PLAYER;
                 // handle_connection(input_field);
             }
             if (button_handle_event(&btn_spectate, &e)) {
                 current_mode = SPECTATOR;
                 handle_spectator_connection();
+
             }
 
             if (button_handle_event(&btn_start_game, &e)) {
                 handle_player_connection(input_field);
             }
-
-
-
         }
 
 
         if (current_mode == MENU) {
             draw_mode_selection(&btn_play, &btn_spectate);
-        }
-        else if (current_mode == PLAYER) {
-            if (!connected) draw_connect(&btn_start_game, &input_field);
-            else draw_game(keyboard_state);
-        }
-        else if (current_mode == SPECTATOR) {
-
+        } else if (current_mode == PLAYER) {
+            if (!connected) {
+                draw_connect(&btn_start_game, &input_field);
+            } else draw_game(keyboard_state);
+        } else if (current_mode == SPECTATOR) {
+            draw_select_to_spectate();
             // draw_spectator_mode();
         }
 
@@ -848,6 +966,7 @@ int window() {
     destroy_button(&btn_spectate);
     destroy_button(&btn_start_game);
     destroy_fruits();
+    destroy_crocodiles();
     if (font) TTF_CloseFont(font);
     TTF_Quit();
     SDL_DestroyRenderer(renderer);
@@ -857,5 +976,9 @@ int window() {
 }
 
 int main() {
+
+    connected = 0;
+    current_mode = MENU;
+    fruit_count = 0;
     return window();
 }

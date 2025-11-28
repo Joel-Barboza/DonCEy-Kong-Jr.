@@ -22,7 +22,10 @@ add_executable(cliente_tcp main.c sdl3.c
         cjson/cJSON_Utils.h
         widgets/fruit.c
         widgets/fruit.h
-        constants.h)
+        constants.h
+        widgets/crocodile.c
+        widgets/crocodile.h
+        constants.c)
 
 if(WIN32)
     target_link_libraries(cliente_tcp PRIVATE ws2_32 SDL3::SDL3 SDL3_ttf::SDL3_ttf SDL3_image::SDL3_image)

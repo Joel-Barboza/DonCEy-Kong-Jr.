@@ -23,6 +23,7 @@ public class AdminScreen extends TemplateScreen {
     private final JPanel previousRightPanel;
     private Timer subscriberRefreshTimer;
     private ButtonGroup fruitGroup;
+    private ButtonGroup crocoGroup;
     private ButtonGroup radioVinesGroup;
     private static JSlider selectedSlider;
     private static JButton btnSend;
@@ -69,26 +70,8 @@ public class AdminScreen extends TemplateScreen {
             b.setFocusable(false);                              // removes focus outline
         }
 
-        // Add buttons with spacing between them
-//        buttonContainer.add(btnSend);
-//        buttonContainer.add(Box.createVerticalStrut(20));       // vertical spacing
         buttonContainer.add(btnBack);
 
-
-//        btnSend.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                System.out.println("pantalla nuevo juego");
-//
-//                // Stops refreshing when leaving this screen
-//                if (subscriberRefreshTimer != null) {
-//                    subscriberRefreshTimer.stop();
-//                }
-//
-////                NewGameScreen screen = new NewGameScreen(leftPanel, rightPanel);
-////                server.addSubscriber();
-//            }
-//        });
 
         btnBack.addActionListener(new ActionListener() {
             @Override
@@ -195,21 +178,21 @@ public class AdminScreen extends TemplateScreen {
         gbc.gridwidth = 1;
         gbc.fill = GridBagConstraints.CENTER;
         ImageIcon appleIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/apple.png")));
-        JRadioButton rbAppleImg = createFruitRadio(appleIcon);
+        JRadioButton rbAppleImg = createRadioImage(appleIcon, "fruit");
         rbAppleImg.setName("Apple");
         gbc.gridx = 0;
         gbc.gridy = 1;
         leftPanel.add(rbAppleImg,gbc);
 
         ImageIcon peachIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/peach.png")));
-        JRadioButton rbPeachImg = createFruitRadio(peachIcon);
+        JRadioButton rbPeachImg = createRadioImage(peachIcon, "fruit");
         rbPeachImg.setName("Peach");
         gbc.gridx = 1;
         gbc.gridy = 1;
         leftPanel.add(rbPeachImg,gbc);
 
         ImageIcon bananaIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/banana.png")));
-        JRadioButton rbBananaImg = createFruitRadio(bananaIcon);
+        JRadioButton rbBananaImg = createRadioImage(bananaIcon, "fruit");
         rbBananaImg.setName("Banana");
         gbc.gridx = 2;
         gbc.gridy = 1;
@@ -252,14 +235,17 @@ public class AdminScreen extends TemplateScreen {
                 System.out.println(heightValue);
 
                 JSONObject rectObject = new JSONObject();
-                rectObject.put("type", Integer.parseInt(fruitGroup.getSelection().getActionCommand()));
                 rectObject.put("x", vineList.get(selectedVine)[0]+3);
                 rectObject.put("y", vineList.get(selectedVine)[1] + heightValue);
                 rectObject.put("width", vineList.get(selectedVine)[2]);
                 rectObject.put("height", vineList.get(selectedVine)[3]);
                 JSONObject obj = new JSONObject();
 
+                obj.put("type", Integer.parseInt(fruitGroup.getSelection().getActionCommand()));
+                obj.put("vine", -1);
                 obj.put("rectangle", rectObject);
+                obj.put("msg_type", "place_fruit");
+
                 writer.println(obj.toString());
                 System.out.println(obj.toString());
 
@@ -298,17 +284,143 @@ public class AdminScreen extends TemplateScreen {
             }
         });
 
+
+
+        crocodiles(gbc, writer);
+        JPanel livesPanel = new JPanel(new FlowLayout());
+        livesPanel.setOpaque(false);
+
+        JButton btnAddLife = new JButton("+ Vida");
+        JButton btnRemoveLife = new JButton("- Vida");
+
+        setButtonStyle(btnAddLife);
+        setButtonStyle(btnRemoveLife);
+
+        livesPanel.add(btnAddLife);
+        livesPanel.add(btnRemoveLife);
+
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 7; // Ajustar según tu layout actual
         gbc.gridwidth = 3;
-        leftPanel.add(btnBack, gbc);  // Add Back button at row 3
+        leftPanel.add(livesPanel, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 8;
+        gbc.gridwidth = 3;
+        leftPanel.add(btnBack, gbc);
+// Action Listeners
+        btnAddLife.addActionListener(e -> {
+            JSONObject obj = new JSONObject();
+            obj.put("command", "ADD_LIFE");
+            writer.println(obj.toString());
+        });
+
+        btnRemoveLife.addActionListener(e -> {
+            JSONObject obj = new JSONObject();
+            obj.put("command", "REMOVE_LIFE");
+            writer.println(obj.toString());
+        });// Add Back button at row 3
+    }
+
+    private void crocodiles(GridBagConstraints gbc, PrintWriter writer) {
+        JLabel crocodilesLabel = new JLabel("Select Crocodile:");
+        crocodilesLabel.setFont(BUTTON_FONT);
+        crocodilesLabel.setOpaque(true);
+        crocodilesLabel.setBackground(YELLOW);
+        crocodilesLabel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        crocodilesLabel.setForeground(Color.black);
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 3;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        leftPanel.add(crocodilesLabel, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.fill = GridBagConstraints.CENTER;
+        ImageIcon blueCrocIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/blue_crocodile.png")));
+        JRadioButton rbBlueCrocImg = createRadioImage(blueCrocIcon, "crocodile");
+        rbBlueCrocImg.setName("Blue");
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        leftPanel.add(rbBlueCrocImg,gbc);
+
+        ImageIcon redCrocIcon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/red_crocodile.png")));
+        JRadioButton rbRedCrocImg = createRadioImage(redCrocIcon, "crocodile");
+        rbRedCrocImg.setName("Red");
+        gbc.gridx = 1;
+        gbc.gridy = 5;
+        leftPanel.add(rbRedCrocImg,gbc);
+
+
+
+        crocoGroup = new ButtonGroup();
+        crocoGroup.add(rbBlueCrocImg);
+        crocoGroup.add(rbRedCrocImg);
+
+        ActionListener listener = e -> {
+            JRadioButton source = (JRadioButton) e.getSource();
+            System.out.println("Selected Crocodile: " + source.getName());
+            updateVinesVisibility();
+        };
+
+        rbBlueCrocImg.setActionCommand("0");   // blue
+        rbRedCrocImg.setActionCommand("1");   // red
+
+        rbBlueCrocImg.addActionListener(listener);
+        rbRedCrocImg.addActionListener(listener);
+
+        btnSend = new JButton("Send");
+        setButtonStyle(btnSend);
+        btnSend.setEnabled(false);
+
+
+        btnSend.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (crocoGroup.getSelection() == null || radioVinesGroup.getSelection() == null) return;
+                System.out.println("Send changes");
+                Integer selectedVine = Integer.parseInt(radioVinesGroup.getSelection().getActionCommand());
+                System.out.println("Selected vine " + selectedVine);
+                System.out.println("Coords: " + vineList.get(selectedVine)[0]);
+
+                JSONObject rectObject = new JSONObject();
+                rectObject.put("x", vineList.get(selectedVine)[0]+3);
+                rectObject.put("y", vineList.get(selectedVine)[1]);
+                rectObject.put("width", vineList.get(selectedVine)[2]);
+                rectObject.put("height", vineList.get(selectedVine)[3]);
+                JSONObject obj = new JSONObject();
+
+                obj.put("type", Integer.parseInt(crocoGroup.getSelection().getActionCommand()));
+                obj.put("vine", selectedVine);
+                obj.put("rectangle", rectObject);
+                obj.put("msg_type", "place_crocodile");
+
+                writer.println(obj.toString());
+                System.out.println(obj.toString());
+
+                fruitGroup.clearSelection();
+                if (selectedSlider != null) {
+                    selectedSlider.setVisible(false);
+                    selectedSlider = null;
+                }
+                updateVinesVisibility();
+                btnSend.setEnabled(false);
+            }
+        });
+
+        gbc.fill = GridBagConstraints.CENTER;
+        gbc.gridx = 0;
+        gbc.gridy = 6;
+        gbc.gridwidth = 3;
+        leftPanel.add(btnSend, gbc);
+
     }
 
     private void updateVinesVisibility() {
-        if (fruitGroup.getSelection() != null) {
+        if (fruitGroup.getSelection() != null || crocoGroup.getSelection() != null) {
             System.out.println("There is a selection");
             radioVinesGroup.getElements().asIterator().forEachRemaining(rb -> rb.setVisible(true));
-//            if (radioVinesGroup.getSelection() != null) {
+            //            if (radioVinesGroup.getSelection() != null) {
 //                sliderHeightGroup.get(Integer.parseInt(radioVinesGroup.getSelection().getActionCommand())).setVisible(true);
 //            }
         } else {
@@ -351,8 +463,11 @@ public class AdminScreen extends TemplateScreen {
             for (JSlider slider: sliderHeightList) {
                 slider.setVisible(false);
             }
-            selectedSlider = sliderHeightList.get(Integer.parseInt(source.getName()));
-            selectedSlider.setVisible(true);
+
+            if (fruitGroup.getSelection() != null) {
+                selectedSlider = sliderHeightList.get(Integer.parseInt(source.getName()));
+                selectedSlider.setVisible(true);
+            }
             btnSend.setEnabled(true);
 
 
@@ -405,9 +520,15 @@ public class AdminScreen extends TemplateScreen {
 
     }
 
-    private JRadioButton createFruitRadio(ImageIcon fruitIcon) {
+    private JRadioButton createRadioImage(ImageIcon fruitIcon, String type) {
         Image originalFruitImg = fruitIcon.getImage();
-        Image fruitImgScaled = originalFruitImg.getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+        Image fruitImgScaled = null;
+        if (Objects.equals(type, "fruit")) {
+            fruitImgScaled = originalFruitImg.getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+        } else if (Objects.equals(type, "crocodile")) {
+            fruitImgScaled = originalFruitImg.getScaledInstance(60, 20, Image.SCALE_SMOOTH);
+        }
+        assert fruitImgScaled != null;
         ImageIcon fruitScaledIcon = new ImageIcon(fruitImgScaled);
 
         JRadioButton radio = new JRadioButton();
