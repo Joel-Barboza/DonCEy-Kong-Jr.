@@ -18,6 +18,10 @@ extern int fruit_count;
 static SOCKET global_socket = INVALID_SOCKET;
 int connected = 0;
 
+// Variables globales para comunicación
+int should_add_life = 0;
+int should_remove_life = 0;
+
 // Function to send a message
 int send_message(const char *message) {
     if (!connected || global_socket == INVALID_SOCKET) {
@@ -193,6 +197,22 @@ bool fruit_JSON(char* json, int* type, int *x, int *y, int *w, int *h) {
     return true;
 }
 
+// Agregar esta función para parsear comandos
+bool parse_life_command(char* json, char** command) {
+    cJSON *parsed_json = cJSON_Parse(json);
+    if (!parsed_json) return false;
+
+    cJSON *jcommand = cJSON_GetObjectItemCaseSensitive(parsed_json, "command");
+    if (!cJSON_IsString(jcommand)) {
+        cJSON_Delete(parsed_json);
+        return false;
+    }
+
+    *command = SDL_strdup(jcommand->valuestring);
+    cJSON_Delete(parsed_json);
+    return (*command != NULL);
+}
+
 
 void add_fruit(int type, int x, int y) {
     if (fruit_count >= MAX_FRUITS) return;
@@ -263,16 +283,26 @@ int socket_thread(void *data) {
             printf("Servidor: %s\n", buffer);
 
             int type, x, y, w, h;
+            char* command = NULL;
 
-            // const char* json = "{\"rectangle\":{\"x\":80,\"width\":6,\"y\":78,\"height\":300}}";
+            // Verificar si es comando de vida
+            if (parse_life_command(buffer, &command)) {
+                printf("Comando de vida: %s\n", command);
 
-            if (fruit_JSON(buffer, &type, &x, &y, &w, &h)) {
+                if (SDL_strcmp(command, "ADD_LIFE") == 0) {
+                    should_add_life = 1;
+                    printf("Marcando para agregar vida\n");
+                } else if (SDL_strcmp(command, "REMOVE_LIFE") == 0) {
+                    should_remove_life = 1;
+                    printf("Marcando para remover vida\n");
+                }
+
+                if (command) SDL_free(command);
+            }
+            // Luego verificar si es fruta
+            else if (fruit_JSON(buffer, &type, &x, &y, &w, &h)) {
                 printf("Rectangle: x=%d y=%d w=%d h=%d\n", x, y, w, h);
-
-                // Fruit fruit = create_fruit(type, x, y);
-                // draw_fruit(&fruit);
                 add_fruit(type, x, y);
-                // SDL_RenderPresent(renderer);
             } else {
                 printf("Invalid JSON\n");
             }

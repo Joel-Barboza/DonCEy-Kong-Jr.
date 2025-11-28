@@ -23,11 +23,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
+extern int should_add_life;
+extern int should_remove_life;
 
 
 extern int connected;
 SDL_Renderer *renderer;
-int lives = 3;
+int lives = 2;
 int game_over = 0;
 TTF_Font *lives_font = NULL;
 
