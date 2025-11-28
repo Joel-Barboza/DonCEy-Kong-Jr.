@@ -64,11 +64,6 @@ typedef struct {
 
 Monkey monkey;
 
-// Constantes de física
-const float GRAVITY = 0.5f;
-const float JUMP_FORCE = -10.0f;
-const float MOVE_SPEED = 3.0f;
-const float CLIMB_SPEED = 2.5f; // Nuevo: velocidad de escalada
 // Función para dibujar las vidas en pantalla
 // Función para dibujar las vidas en pantalla (sin TTF)
 void draw_lives() {
@@ -92,6 +87,17 @@ void lose_life() {
         if (lives <= 0) {
             game_over = 1;
         }
+    }
+
+    if (!game_over) {
+        // Solo reiniciar posición si el juego no ha terminado
+        monkey.rect.x = 50.0f;
+        monkey.rect.y = 470.0f;
+        monkey.velocityX = 0.0f;
+        monkey.velocityY = 0.0f;
+        monkey.isOnGround = 1;
+        monkey.isOnVine = 0;
+        monkey.currentVine = -1;
     }
 }
 
@@ -234,6 +240,17 @@ void update_monkey_physics() {
             }
         }
 
+        for (int i = 0; i < crocodile_count; i++) {
+            if (monkey.rect.x < crocodiles[i].rect.x + crocodiles[i].rect.w &&
+                monkey.rect.x + monkey.rect.w > crocodiles[i].rect.x &&
+                monkey.rect.y < crocodiles[i].rect.y + crocodiles[i].rect.h &&
+                monkey.rect.y + monkey.rect.h > crocodiles[i].rect.y) {
+                lose_life();
+                return;
+
+                }
+        }
+
         return; // Saltar el resto de la física normal cuando está en liana
     }
     if (monkey.rect.x <= 140.0f && monkey.rect.y <= 30.0f) {
@@ -250,16 +267,6 @@ void update_monkey_physics() {
         // El mono cayó - perder una vida
         lose_life();
 
-        if (!game_over) {
-            // Solo reiniciar posición si el juego no ha terminado
-            monkey.rect.x = 50.0f;
-            monkey.rect.y = 470.0f;
-            monkey.velocityX = 0.0f;
-            monkey.velocityY = 0.0f;
-            monkey.isOnGround = 1;
-            monkey.isOnVine = 0;
-            monkey.currentVine = -1;
-        }
         return;
     }
     // Física normal (cuando no está en liana)
@@ -315,8 +322,9 @@ void update_monkey_physics() {
             monkey.rect.x + monkey.rect.w > crocodiles[i].rect.x &&
             monkey.rect.y < crocodiles[i].rect.y + crocodiles[i].rect.h &&
             monkey.rect.y + monkey.rect.h > crocodiles[i].rect.y) {
+            lose_life();
+            return;
 
-            printf("crocodile collision\n");
             }
     }
 

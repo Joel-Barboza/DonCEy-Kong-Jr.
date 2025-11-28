@@ -287,10 +287,6 @@ public class AdminScreen extends TemplateScreen {
 
 
         crocodiles(gbc, writer);
-        gbc.gridx = 0;
-        gbc.gridy = 7;
-        gbc.gridwidth = 3;
-        leftPanel.add(btnBack, gbc);
         JPanel livesPanel = new JPanel(new FlowLayout());
         livesPanel.setOpaque(false);
 
@@ -304,10 +300,14 @@ public class AdminScreen extends TemplateScreen {
         livesPanel.add(btnRemoveLife);
 
         gbc.gridx = 0;
-        gbc.gridy = 4; // Ajustar según tu layout actual
+        gbc.gridy = 7; // Ajustar según tu layout actual
         gbc.gridwidth = 3;
         leftPanel.add(livesPanel, gbc);
 
+        gbc.gridx = 0;
+        gbc.gridy = 8;
+        gbc.gridwidth = 3;
+        leftPanel.add(btnBack, gbc);
 // Action Listeners
         btnAddLife.addActionListener(e -> {
             JSONObject obj = new JSONObject();
