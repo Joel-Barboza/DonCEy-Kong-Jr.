@@ -301,7 +301,36 @@ public class AdminScreen extends TemplateScreen {
         gbc.gridx = 0;
         gbc.gridy = 3;
         gbc.gridwidth = 3;
-        leftPanel.add(btnBack, gbc);  // Add Back button at row 3
+        leftPanel.add(btnBack, gbc);
+        JPanel livesPanel = new JPanel(new FlowLayout());
+        livesPanel.setOpaque(false);
+
+        JButton btnAddLife = new JButton("+ Vida");
+        JButton btnRemoveLife = new JButton("- Vida");
+
+        setButtonStyle(btnAddLife);
+        setButtonStyle(btnRemoveLife);
+
+        livesPanel.add(btnAddLife);
+        livesPanel.add(btnRemoveLife);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4; // Ajustar según tu layout actual
+        gbc.gridwidth = 3;
+        leftPanel.add(livesPanel, gbc);
+
+// Action Listeners
+        btnAddLife.addActionListener(e -> {
+            JSONObject obj = new JSONObject();
+            obj.put("command", "ADD_LIFE");
+            writer.println(obj.toString());
+        });
+
+        btnRemoveLife.addActionListener(e -> {
+            JSONObject obj = new JSONObject();
+            obj.put("command", "REMOVE_LIFE");
+            writer.println(obj.toString());
+        });// Add Back button at row 3
     }
 
     private void updateVinesVisibility() {

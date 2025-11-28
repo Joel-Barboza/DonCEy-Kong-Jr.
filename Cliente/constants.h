@@ -10,6 +10,7 @@
 
 #define NUM_PLATFORMS 12
 #define NUM_VINES 14
+
 #define MAX_FRUITS 100
 
 
